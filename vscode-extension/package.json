@@ -1,0 +1,55 @@
+{
+  "name": "pr-reviewer-vscode",
+  "displayName": "PR Reviewer",
+  "description": "View AI code-review findings for the current branch's PR and trigger reviews from VS Code.",
+  "version": "0.1.0",
+  "publisher": "pr-reviewer",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Linters", "SCM Providers", "Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "prReviewer.showFindings",
+        "title": "PR Reviewer: Show Findings for a PR"
+      },
+      {
+        "command": "prReviewer.triggerReview",
+        "title": "PR Reviewer: Trigger Review"
+      },
+      {
+        "command": "prReviewer.clearFindings",
+        "title": "PR Reviewer: Clear Findings"
+      }
+    ],
+    "configuration": {
+      "title": "PR Reviewer",
+      "properties": {
+        "prReviewer.serverUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Base URL of your PR Reviewer server, e.g. `https://pr-reviewer.yourco.com`."
+        },
+        "prReviewer.apiToken": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "A PR Reviewer API token (starts with `prt_`). Generate one under Settings → API Tokens."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

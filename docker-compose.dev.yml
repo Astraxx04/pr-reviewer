@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: pr_reviewer
+      POSTGRES_PASSWORD: pr_reviewer
+      POSTGRES_DB: pr_reviewer
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pr_reviewer"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # One-shot migration step (mirrors docker-compose.yml). Runs the server binary
+  # in MIGRATE_ONLY mode to apply app (golang-migrate) + River migrations, then
+  # exits. app waits for it to complete before starting. Set SKIP_MIGRATIONS=true
+  # (in .env or the shell) to make this a no-op that exits 0.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - go_mod_cache:/root/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    command: go run ./cmd/server
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://pr_reviewer:pr_reviewer@postgres:5432/pr_reviewer?sslmode=disable
+      MIGRATE_ONLY: "true"
+      SKIP_MIGRATIONS: "${SKIP_MIGRATIONS:-false}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - go_mod_cache:/root/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    command: air
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://pr_reviewer:pr_reviewer@postgres:5432/pr_reviewer?sslmode=disable
+      APP_ENV: development
+      SERVER_PORT: "8001"
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./web:/app
+      # Separate volume prevents macOS node_modules from overwriting Linux binaries.
+      - web_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - app
+
+  # Public tunnel for INBOUND GitHub webhooks only. Browser traffic (OAuth, API,
+  # SSE) stays on localhost — routing the browser through ngrok's free tier trips
+  # the ERR_NGROK_6024 interstitial, which the SSE EventSource can't bypass.
+  # Uses a reserved static domain so the URL is stable; set the GitHub App's
+  # webhook URL to https://${NGROK_DOMAIN}/<webhook path> once. Requires
+  # NGROK_AUTHTOKEN in .env (https://dashboard.ngrok.com/get-started/your-authtoken).
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: http app:8001 --url=https://${NGROK_DOMAIN:-herta-bacillary-sha.ngrok-free.dev} --log stdout
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  go_mod_cache:
+  go_build_cache:
+  web_node_modules:

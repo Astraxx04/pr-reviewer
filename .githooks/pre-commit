@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook mirroring the CI "lint" / "build" / "build-web" jobs locally.
+# Installed via `make hooks` (sets git config core.hooksPath .githooks).
+# Bypass for a single commit with:  git commit --no-verify
+#
+# It only runs the checks relevant to what you staged (Go checks when .go files
+# change, web type-check when web/ changes), so doc-only commits stay instant.
+# Heavier CI jobs that need a database (go test, schema-drift) are NOT run
+# here — CI covers those.
+set -uo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root" || exit 1
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -z "$staged" ] && exit 0
+
+go_changed="$(echo "$staged" | grep -E '\.go$' || true)"
+web_changed="$(echo "$staged" | grep -E '^web/' || true)"
+
+fail=0
+
+if [ -n "$go_changed" ]; then
+  echo "▶ gofmt (staged Go files)"
+  unformatted="$(gofmt -l $go_changed 2>/dev/null || true)"
+  if [ -n "$unformatted" ]; then
+    echo "✗ these files need formatting — run: gofmt -w $unformatted"
+    fail=1
+  fi
+
+  echo "▶ go vet ./..."
+  go vet ./... || fail=1
+
+  if command -v golangci-lint >/dev/null 2>&1; then
+    echo "▶ golangci-lint run"
+    golangci-lint run || fail=1
+  else
+    echo "⚠ golangci-lint not installed — skipping (CI still runs it, v2.12.2)."
+    echo "  Install: https://golangci-lint.run/usage/install/"
+  fi
+fi
+
+if [ -n "$web_changed" ]; then
+  if [ -d web/node_modules ]; then
+    echo "▶ web: tsc --noEmit"
+    ( cd web && npx --no-install tsc --noEmit ) || fail=1
+  else
+    echo "⚠ web/node_modules missing — skipping tsc (run: cd web && npm ci)."
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "✗ pre-commit checks failed. Fix the above, or bypass with: git commit --no-verify"
+  exit 1
+fi
+echo "✓ pre-commit checks passed"
