@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { getSetupStatus, completeSetup, type SetupStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -110,7 +111,9 @@ export default function SetupPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-8">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold mb-2">Welcome to PR Reviewer</h1>
+          <div className="flex justify-center mb-4">
+            <Image src="/logo.png" alt="PR Reviewer" width={1024} height={1024} style={{ height: '3rem', width: 'auto' }} priority />
+          </div>
           <p className="text-muted-foreground">Let's get your self-hosted instance configured.</p>
         </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { getSetupStatus } from "@/lib/api";
 
@@ -31,7 +32,9 @@ export default function LoginPage() {
       </Suspense>
       <div className="w-full max-w-sm space-y-8 p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">PR Reviewer</h1>
+          <div className="flex justify-center mb-4">
+            <Image src="/logo.png" alt="PR Reviewer" width={1024} height={1024} style={{ height: '10rem', width: 'auto' }} priority />
+          </div>
           <p className="mt-2 text-muted-foreground">AI-powered pull request analysis</p>
         </div>
         <a href={loginUrl} className="block">

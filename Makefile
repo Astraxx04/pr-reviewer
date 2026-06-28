@@ -1,63 +1,77 @@
 # PR Reviewer — Makefile (dev only)
 
-.PHONY: dev dev-build dev-down dev-logs dev-shell test fmt lint hooks migrate migrate-down migrate-status migrate-new seed help
+.PHONY: up build down logs logs-app logs-web logs-postgres logs-ngrok shell test format lint hooks migrate migrate-down migrate-status migrate-new seed help
 
 DEV_COMPOSE := docker compose -f docker-compose.dev.yml
 
-## dev: start the full dev stack in Docker (postgres + backend live-reload + frontend watch)
-dev:
+## up: start the full dev stack (postgres + backend live-reload + frontend watch)
+up:
 	@test -f .env || { echo "Error: .env not found. Run: cp .env.example .env"; exit 1; }
-	$(DEV_COMPOSE) up
+	$(DEV_COMPOSE) up -d
 
-## dev-build: rebuild dev images, then start the stack (run after changing Dockerfile.dev or deps)
-dev-build:
+## build: rebuild dev images, then start the stack (run after changing Dockerfile.dev or deps)
+build:
 	@test -f .env || { echo "Error: .env not found. Run: cp .env.example .env"; exit 1; }
-	$(DEV_COMPOSE) up --build
+	$(DEV_COMPOSE) up --build -d
 
-## dev-down: stop the dev stack (add ARGS=-v to also drop the postgres volume)
-dev-down:
+## down: stop the dev stack (add ARGS=-v to also drop the postgres volume)
+down:
 	$(DEV_COMPOSE) down $(ARGS)
 
-## dev-logs: tail logs from the dev stack
-dev-logs:
+## logs: tail logs from all services
+logs:
 	$(DEV_COMPOSE) logs -f
 
-## dev-shell: open a shell inside a running dev container (defaults to app; override with SVC=web)
-dev-shell:
-	$(DEV_COMPOSE) exec $(or $(SVC),app) sh
+## logs-app: tail logs from the backend container
+logs-app:
+	$(DEV_COMPOSE) logs -f app
+
+## logs-web: tail logs from the frontend container
+logs-web:
+	$(DEV_COMPOSE) logs -f web
+
+## logs-postgres: tail logs from the postgres container
+logs-postgres:
+	$(DEV_COMPOSE) logs -f postgres
+
+## logs-ngrok: tail logs from the ngrok container
+logs-ngrok:
+	$(DEV_COMPOSE) logs -f ngrok
+
+## shell: open a shell inside a running dev container (defaults to app; override with ser=web)
+shell:
+	$(DEV_COMPOSE) exec $(or $(ser),app) sh
 
 ## test: run Go tests (with race detector) and TypeScript type-check
 test:
-	@echo "Running Go tests..."
-	go test -race ./...
-	@echo "Type-checking frontend..."
-	cd web && npx tsc --noEmit
+	$(DEV_COMPOSE) exec app go test -race ./...
+	$(DEV_COMPOSE) exec web npx tsc --noEmit
 
 ## format: format Go and frontend source files
 format:
-	gofmt -w .
-	cd web && npx prettier --write .
+	$(DEV_COMPOSE) exec app gofmt -w .
+	$(DEV_COMPOSE) exec web npx prettier --write .
 
 ## lint: run golangci-lint (same linter/version as CI)
 lint:
-	golangci-lint run
+	$(DEV_COMPOSE) exec app golangci-lint run
 
 ## hooks: install the git pre-commit hook (lint/vet/tsc before each commit)
 hooks:
 	git config core.hooksPath .githooks
 	@echo "✓ pre-commit hook installed (.githooks). Bypass once with: git commit --no-verify"
 
-## migrate: apply all pending migrations (app schema + River queue)
+## migrate: apply all pending migrations
 migrate:
-	go run ./cmd/migrate up
+	$(DEV_COMPOSE) exec app go run ./cmd/migrate up
 
 ## migrate-down: roll back the most recent app migration
 migrate-down:
-	go run ./cmd/migrate down
+	$(DEV_COMPOSE) exec app go run ./cmd/migrate down
 
 ## migrate-status: show the applied vs latest migration version
 migrate-status:
-	go run ./cmd/migrate status
+	$(DEV_COMPOSE) exec app go run ./cmd/migrate status
 
 ## migrate-new: scaffold a new migration pair (usage: make migrate-new name=add_foo)
 migrate-new:
@@ -72,7 +86,7 @@ migrate-new:
 
 ## seed: seed the database with sample data
 seed:
-	go run ./cmd/seed
+	$(DEV_COMPOSE) exec app go run ./cmd/seed
 
 ## help: print this help message
 help:

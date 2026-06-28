@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -64,9 +65,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         )}
         aria-label="Main navigation"
       >
-        <div className="mb-6 flex items-center justify-between px-3">
-          <Link href="/dashboard" className="text-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm">
-            PR Reviewer
+        <div className="mb-1 flex items-center justify-between px-3">
+          <Link href="/dashboard" className="block w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm">
+            <Image src="/logo-horizontal.png" alt="PR Reviewer" width={1983} height={793} style={{ width: '100%', height: 'auto' }} priority />
           </Link>
           {isMobileControlled && (
             <Button
