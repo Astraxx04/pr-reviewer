@@ -233,7 +233,7 @@ make up / make down   docker compose up/down
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SERVER_PORT` | no | `8080` | Port the API listens on |
+| `SERVER_PORT` | no | `8001` | Port the API listens on |
 | `DATABASE_URL` | yes | — | PostgreSQL connection string (pgvector required) |
 | `GITHUB_CLIENT_ID` | yes | — | GitHub OAuth App client ID |
 | `GITHUB_CLIENT_SECRET` | yes | — | GitHub OAuth App client secret |

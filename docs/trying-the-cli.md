@@ -86,10 +86,6 @@ curl http://localhost:8001/health     # -> ok
 curl http://localhost:8001/healthz    # -> {"status":"ok","db":"ok",...}
 ```
 
-> ⚠️ **Port gotcha:** the CLI's built-in default server is `http://localhost:8080`,
-> but this repo runs on **8001**. Always pass `--server http://localhost:8001`
-> (or save it once with `auth login` — see step 4).
-
 ---
 
 ## 3. Get a token
@@ -253,7 +249,7 @@ Get help on any command with `--help`, e.g.:
 | `not authenticated: run auth login...` | No token resolved. Pass `--token`, set `PR_REVIEWER_TOKEN`, or `auth login`. |
 | `server returned 401` | Token expired (JWT) or revoked. Re-login or mint a fresh `prt_` token. |
 | `server returned 403` | Your user lacks the role for that action (e.g. `tokens` is admin-only). |
-| Connection refused | Backend not running, or wrong port — remember it's **8001**, not 8080. |
+| Connection refused | Backend not running, or wrong port — remember it's **8001**. |
 | Empty lists everywhere | No data yet — run `make seed`, or connect a real repo + open a PR. |
 | `token verification failed` | Wrong `--server`, or token minted against a different `JWT_SECRET`. |
 

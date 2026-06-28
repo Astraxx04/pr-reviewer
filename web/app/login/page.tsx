@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { getSetupStatus } from "@/lib/api";
 
-const loginUrl = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/auth/github`;
+const loginUrl = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001"}/auth/github`;
 
 function SetupGuard() {
   const router = useRouter();

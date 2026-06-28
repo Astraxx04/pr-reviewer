@@ -34,7 +34,7 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	return &Config{
-		ServerPort:         getEnv("SERVER_PORT", "8080"),
+		ServerPort:         getEnv("SERVER_PORT", "8001"),
 		GitHubClientID:     getEnv("GITHUB_CLIENT_ID", ""),
 		GitHubClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
 		DatabaseURL:        getEnv("DATABASE_URL", ""),

@@ -12,7 +12,7 @@ type config struct {
 	Token  string `json:"token"`
 }
 
-const defaultServer = "http://localhost:8080"
+const defaultServer = "http://localhost:8001"
 
 // configPath returns the resolved config file path, honouring --config / the
 // PR_REVIEWER_CONFIG env var, then falling back to ~/.config/pr-reviewer/config.json.

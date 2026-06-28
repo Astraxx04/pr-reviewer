@@ -103,7 +103,7 @@ Shared logging utility.
 ## Configuration
 
 The application is configured via environment variables:
-- `SERVER_PORT`: Port to listen on (binary default: 8080; the Docker and local dev setups override this to 8001).
+- `SERVER_PORT`: Port to listen on (binary default: 8001; the Docker and local dev setups override this to 8001).
 - `APP_ENV`: Application environment (development/production).
 - `DATABASE_URL`: Postgres connection string (loaded from `.env`, but an existing shell value takes precedence).
 - `MIGRATE_ONLY`: When `true`, the server binary applies migrations and exits instead of serving. Used by the docker-compose `migrate` one-shot service.
