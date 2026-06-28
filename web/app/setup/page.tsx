@@ -38,6 +38,7 @@ function StepIndicator({
         <div key={step.id} className="flex items-center">
           <button
             onClick={() => onStepClick(i)}
+            style={{ cursor: 'pointer' }}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               i === current
                 ? "bg-primary text-primary-foreground"
@@ -54,7 +55,7 @@ function StepIndicator({
             {step.label}
           </button>
           {i < STEPS.length - 1 && (
-            <div className={`h-px w-16 mx-1 ${states[i] ? "bg-green-400" : "bg-border"}`} />
+            <div className={`h-px w-12 mx-2 ${states[i] ? "bg-green-400" : "bg-border"}`} />
           )}
         </div>
       ))}
@@ -135,7 +136,7 @@ export default function SetupPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {serverDown ? (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
                   <div className="flex items-center gap-2 text-destructive font-medium">
                     <XCircle className="h-5 w-5" />
                     Server not reachable
@@ -143,7 +144,7 @@ export default function SetupPage() {
                   <p className="text-sm text-muted-foreground">
                     Make sure the backend server is running and the API is accessible before continuing.
                   </p>
-                  <Button variant="outline" size="sm" onClick={loadStatus}>
+                  <Button variant="outline" size="sm" onClick={loadStatus} style={{ cursor: 'pointer' }}>
                     Retry
                   </Button>
                 </div>
@@ -156,7 +157,7 @@ export default function SetupPage() {
                   <p className="text-sm text-muted-foreground">
                     The backend is running and the database connection is healthy.
                   </p>
-                  <Button onClick={() => setStep(1)}>Next: GitHub →</Button>
+                  <Button onClick={() => setStep(1)} style={{ cursor: 'pointer' }}>Next: GitHub →</Button>
                 </>
               )}
             </CardContent>
@@ -181,11 +182,11 @@ export default function SetupPage() {
                     <CheckCircle2 className="h-5 w-5" />
                     GitHub OAuth configured
                   </div>
-                  <Button onClick={() => setStep(2)}>Next: Launch →</Button>
+                  <Button onClick={() => setStep(2)} style={{ cursor: 'pointer' }}>Next: Launch →</Button>
                 </>
               ) : (
                 <>
-                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 text-sm space-y-3">
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 text-sm space-y-3">
                     <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
                       <XCircle className="h-4 w-4" />
                       GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are not set
@@ -196,7 +197,7 @@ export default function SetupPage() {
                       <li>Copy the Client ID + Secret into your environment and restart the server</li>
                     </ol>
                   </div>
-                  <Button variant="outline" onClick={() => { loadStatus(); toast.info("Status refreshed"); }}>
+                  <Button variant="outline" onClick={() => { loadStatus(); toast.info("Status refreshed"); }} style={{ cursor: 'pointer' }}>
                     Refresh status
                   </Button>
                 </>
@@ -215,7 +216,7 @@ export default function SetupPage() {
               <CardDescription>Review your setup and complete the wizard.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2 text-sm">
+              <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   {!serverDown
                     ? <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -240,6 +241,7 @@ export default function SetupPage() {
               <Button
                 onClick={finish}
                 disabled={completing || !status?.github_configured || serverDown}
+                style={{ cursor: 'pointer' }}
               >
                 {completing ? "Finishing…" : "Complete setup & go to login"}
               </Button>

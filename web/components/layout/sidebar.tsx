@@ -125,6 +125,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             className="flex-1 justify-start gap-3 text-muted-foreground"
             onClick={logout}
             aria-label="Sign out"
+            style={{ cursor: 'pointer' }}
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             Sign out

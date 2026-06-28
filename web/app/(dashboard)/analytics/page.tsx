@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
         <h1 className="text-2xl font-bold">Analytics</h1>
         <div className="flex gap-2">
           {RANGES.map((d) => (
-            <Button key={d} size="sm" variant={days === d ? "default" : "outline"} onClick={() => setDays(d)}>
+            <Button key={d} size="sm" variant={days === d ? "default" : "outline"} onClick={() => setDays(d)} style={{ cursor: 'pointer' }}>
               {d}d
             </Button>
           ))}

@@ -91,6 +91,7 @@ export default function PRsPage() {
             variant={status === f.value ? "default" : "outline"}
             onClick={() => { setStatus(f.value); setPage(1); }}
             aria-pressed={status === f.value}
+            style={{ cursor: 'pointer' }}
           >
             {f.label}
           </Button>

@@ -9,10 +9,12 @@ up:
 	@test -f .env || { echo "Error: .env not found. Run: cp .env.example .env"; exit 1; }
 	$(DEV_COMPOSE) up -d
 
-## build: rebuild dev images, then start the stack (run after changing Dockerfile.dev or deps)
+## build: clear Next.js + Docker build caches, rebuild images, then start the stack
 build:
 	@test -f .env || { echo "Error: .env not found. Run: cp .env.example .env"; exit 1; }
-	$(DEV_COMPOSE) up --build -d
+	rm -rf ./web/.next
+	$(DEV_COMPOSE) build --no-cache
+	$(DEV_COMPOSE) up -d
 
 ## down: stop the dev stack (add ARGS=-v to also drop the postgres volume)
 down:

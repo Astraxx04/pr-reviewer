@@ -82,7 +82,7 @@ export default function ReposPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Repositories</h1>
         {isAdmin && (
-          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing} style={{ cursor: 'pointer' }}>
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Syncing…" : "Sync from GitHub"}
           </Button>
