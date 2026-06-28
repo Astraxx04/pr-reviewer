@@ -112,7 +112,7 @@ export default function SetupPage() {
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">
-            <Image src="/logo.png" alt="PR Reviewer" width={1024} height={1024} style={{ height: '3rem', width: 'auto' }} priority />
+            <Image src="/logo.png" alt="PR Reviewer" width={1024} height={1024} style={{ height: '6rem', width: 'auto' }} priority />
           </div>
           <p className="text-muted-foreground">Let's get your self-hosted instance configured.</p>
         </div>

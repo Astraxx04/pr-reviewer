@@ -104,6 +104,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         <div className="flex items-center gap-1 border-t pt-3 mt-2">
+          {/* Theme toggle — uncomment to re-enable light/dark switching
           <Button
             variant="ghost"
             size="icon"
@@ -118,6 +119,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <Moon className="h-4 w-4" aria-hidden="true" />
             )}
           </Button>
+          */}
           <Button
             variant="ghost"
             className="flex-1 justify-start gap-3 text-muted-foreground"
