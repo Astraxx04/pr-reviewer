@@ -1,14 +1,13 @@
 {
-  "name": "pr-reviewer",
-  "displayName": "PR Reviewer",
+  "name": "prrev",
+  "displayName": "PR-Reviewer",
   "description": "AI-powered PR reviews inside VS Code — inline findings, gutter icons, sidebar panel, and auto-refresh for your current branch.",
   "version": "0.1.0",
-  "publisher": "astraxx",
+  "publisher": "astraxxx",
   "repository": {
     "type": "git",
     "url": "https://github.com/Astraxx04/pr-reviewer.git"
   },
-  "private": true,
   "engines": {
     "vscode": "^1.85.0"
   },
