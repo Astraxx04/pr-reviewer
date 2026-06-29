@@ -16,9 +16,12 @@ case "$ARCH" in
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
-# Fetch the latest release tag.
-LATEST="$(curl -fsSL "${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')"
-if [ -z "$LATEST" ]; then
+# Determine the latest release tag by following the /releases/latest redirect,
+# which resolves to .../releases/tag/<tag>. This avoids the GitHub API (and its
+# unauthenticated rate limit) and works without jq.
+FINAL_URL="$(curl -fsSL -o /dev/null -w '%{url_effective}' "${REPO}/releases/latest")"
+LATEST="${FINAL_URL##*/tag/}"
+if [ -z "$LATEST" ] || [ "$LATEST" = "$FINAL_URL" ]; then
   echo "Could not determine latest release. Visit ${REPO}/releases to download manually." >&2
   exit 1
 fi
