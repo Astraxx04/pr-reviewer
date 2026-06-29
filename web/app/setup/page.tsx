@@ -144,7 +144,7 @@ export default function SetupPage() {
                   <p className="text-sm text-muted-foreground">
                     Make sure the backend server is running and the API is accessible before continuing.
                   </p>
-                  <Button variant="outline" size="sm" onClick={loadStatus} style={{ cursor: 'pointer' }}>
+                  <Button variant="outline" size="sm" onClick={loadStatus}>
                     Retry
                   </Button>
                 </div>
@@ -157,7 +157,7 @@ export default function SetupPage() {
                   <p className="text-sm text-muted-foreground">
                     The backend is running and the database connection is healthy.
                   </p>
-                  <Button onClick={() => setStep(1)} style={{ cursor: 'pointer' }}>Next: GitHub →</Button>
+                  <Button onClick={() => setStep(1)}>Next: GitHub →</Button>
                 </>
               )}
             </CardContent>
@@ -182,7 +182,7 @@ export default function SetupPage() {
                     <CheckCircle2 className="h-5 w-5" />
                     GitHub OAuth configured
                   </div>
-                  <Button onClick={() => setStep(2)} style={{ cursor: 'pointer' }}>Next: Launch →</Button>
+                  <Button onClick={() => setStep(2)}>Next: Launch →</Button>
                 </>
               ) : (
                 <>
@@ -197,7 +197,7 @@ export default function SetupPage() {
                       <li>Copy the Client ID + Secret into your environment and restart the server</li>
                     </ol>
                   </div>
-                  <Button variant="outline" onClick={() => { loadStatus(); toast.info("Status refreshed"); }} style={{ cursor: 'pointer' }}>
+                  <Button variant="outline" onClick={() => { loadStatus(); toast.info("Status refreshed"); }}>
                     Refresh status
                   </Button>
                 </>
@@ -241,7 +241,6 @@ export default function SetupPage() {
               <Button
                 onClick={finish}
                 disabled={completing || !status?.github_configured || serverDown}
-                style={{ cursor: 'pointer' }}
               >
                 {completing ? "Finishing…" : "Complete setup & go to login"}
               </Button>

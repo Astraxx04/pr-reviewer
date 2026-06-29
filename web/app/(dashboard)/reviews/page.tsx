@@ -55,8 +55,8 @@ export default function ReviewsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Reviews</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} style={{ cursor: 'pointer' }}>Export CSV</Button>
-          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exportingPDF} style={{ cursor: 'pointer' }}>
+          <Button variant="outline" size="sm" onClick={handleExport}>Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exportingPDF}>
             {exportingPDF ? "Generating…" : "Export PDF"}
           </Button>
         </div>

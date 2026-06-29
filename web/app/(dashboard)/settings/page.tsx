@@ -92,7 +92,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <Link href={href}>
-                <Button variant="outline" size="sm" style={{ cursor: 'pointer' }}>{label}</Button>
+                <Button variant="outline" size="sm">{label}</Button>
               </Link>
             </CardContent>
           </Card>

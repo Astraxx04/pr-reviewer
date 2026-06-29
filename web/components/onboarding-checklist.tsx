@@ -84,7 +84,6 @@ export function OnboardingChecklist({ token }: { token: string }) {
               onClick={() => setCollapsed((c) => !c)}
               aria-label={collapsed ? "Expand checklist" : "Collapse checklist"}
               aria-expanded={!collapsed}
-              style={{ cursor: 'pointer' }}
             >
               {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </Button>
@@ -94,7 +93,6 @@ export function OnboardingChecklist({ token }: { token: string }) {
               className="h-7 w-7 text-muted-foreground"
               onClick={dismiss}
               aria-label="Dismiss onboarding checklist"
-              style={{ cursor: 'pointer' }}
             >
               <X className="h-4 w-4" />
             </Button>

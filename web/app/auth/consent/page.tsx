@@ -50,7 +50,6 @@ function Consent() {
             type="submit"
             size="lg"
             className="w-full"
-            style={{ cursor: "pointer" }}
           >
             Yes, continue
           </Button>

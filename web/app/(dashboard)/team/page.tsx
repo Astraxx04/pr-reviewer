@@ -97,7 +97,7 @@ export default function TeamPage() {
             Add members by GitHub username. They sign in with GitHub — their role takes effect on first login.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)} style={{ cursor: 'pointer' }}>Add Member</Button>
+        <Button onClick={() => setOpen(true)}>Add Member</Button>
       </div>
 
       {members.length === 0 ? (
