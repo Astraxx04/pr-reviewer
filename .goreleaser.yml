@@ -123,9 +123,11 @@ changelog:
 dockers:
   - id: server
     ids: [server]
+    # ghcr/Docker repository names must be lowercase, but the owner login can
+    # contain uppercase (Astraxx04) — so lowercase it here.
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}"
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:latest"
+      - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}"
+      - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:latest"
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -147,7 +149,7 @@ release:
     ## Docker
 
     ```
-    docker pull ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}
+    docker pull ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}
     ```
 
     ## Quick install
