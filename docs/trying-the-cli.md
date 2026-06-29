@@ -43,8 +43,8 @@ brew install Astraxx04/tap/prrev
 go install github.com/Astraxx04/pr-reviewer/cmd/prrev@latest
 ```
 
-**c) Release one-liner** — downloads the right prebuilt binary and installs
-`prrev` (plus the server binaries) to `/usr/local/bin`:
+**c) Release one-liner** — downloads the right prebuilt `prrev` binary and
+installs it to `/usr/local/bin` (override with `INSTALL_DIR=...`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh

@@ -1,45 +1,15 @@
 version: 2
 
-project_name: pr-reviewer
+# This release ships ONLY the prrev CLI. The server (cmd/server) and migrations
+# (cmd/migrate) are not part of the release — deploy those from source or
+# docker-compose. See README / docs for self-hosting the backend.
+project_name: prrev
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: server
-    main: ./cmd/server
-    binary: pr-reviewer
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
-
-  - id: migrate
-    main: ./cmd/migrate
-    binary: pr-reviewer-migrate
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
-
   - id: cli
     main: ./cmd/prrev
     binary: prrev
@@ -57,20 +27,6 @@ builds:
       - -X main.version={{.Version}}
 
 archives:
-  # Full bundle (server + migrate + prrev) — used by install.sh.
-  - id: default
-    ids: [server, migrate, cli]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        formats: [zip]
-    files:
-      - README.md
-      - docker-compose.yml
-      - .env.example
-
-  # CLI-only bundle — used by the Homebrew cask so `brew install prrev`
-  # installs just the CLI, not the server binaries.
   - id: cli
     ids: [cli]
     name_template: "prrev_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -86,7 +42,7 @@ archives:
 # `go install`.
 homebrew_casks:
   - name: prrev
-    ids: [cli] # pull from the CLI-only archive
+    ids: [cli]
     homepage: "https://github.com/Astraxx04/pr-reviewer"
     description: "CLI for the PR Reviewer service"
     license: "MIT"
@@ -120,24 +76,6 @@ changelog:
       - "Merge pull request"
       - "Merge branch"
 
-dockers:
-  - id: server
-    ids: [server]
-    # ghcr/Docker repository names must be lowercase, but the owner login can
-    # contain uppercase (Astraxx04) — so lowercase it here.
-    image_templates:
-      - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}"
-      - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:latest"
-    # Uses the prebuilt binary (see Dockerfile.release) — GoReleaser's build
-    # context has the compiled artifact, not the Go source.
-    dockerfile: Dockerfile.release
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title=pr-reviewer"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-
 release:
   github:
     owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
@@ -146,14 +84,15 @@ release:
   prerelease: auto
   name_template: "v{{ .Version }}"
   footer: |
-    ## Docker
-
-    ```
-    docker pull ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}
-    ```
-
-    ## Quick install
+    ## Install the CLI
 
     ```bash
+    # Homebrew (macOS)
+    brew install Astraxx04/tap/prrev
+
+    # go install
+    go install github.com/Astraxx04/pr-reviewer/cmd/prrev@latest
+
+    # install script (macOS/Linux)
     curl -fsSL https://raw.githubusercontent.com/{{ .Env.GITHUB_REPOSITORY }}/main/install.sh | sh
     ```

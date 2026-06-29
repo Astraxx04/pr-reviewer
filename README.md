@@ -180,7 +180,7 @@ brew install Astraxx04/tap/prrev
 # go install:
 go install github.com/Astraxx04/pr-reviewer/cmd/prrev@latest
 
-# release one-liner (also installs the server binaries):
+# install script (macOS/Linux):
 curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh
 
 # …or build from source:
