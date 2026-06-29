@@ -80,6 +80,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	if cfg.AuthHandler != nil {
 		mux.HandleFunc("GET /auth/github", cfg.AuthHandler.Login)
 		mux.HandleFunc("GET /auth/github/callback", cfg.AuthHandler.Callback)
+		mux.HandleFunc("GET /auth/github/consent", cfg.AuthHandler.ConsentPage)
+		mux.HandleFunc("POST /auth/github/continue", cfg.AuthHandler.ContinueLogin)
 	}
 
 	// OIDC SSO routes (public — redirect-based flow).

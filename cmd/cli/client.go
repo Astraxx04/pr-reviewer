@@ -3,13 +3,39 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+// errSessionExpired is returned when the stored token is provably expired, so the
+// user gets a clear "log in again" message instead of a raw 401.
+var errSessionExpired = fmt.Errorf("session expired — run: prrev auth login")
+
+// tokenExpired reports whether a JWT's exp claim is in the past. Only JWTs carry a
+// readable expiry; API tokens (prt_…) return false here and are validated server-side.
+func tokenExpired(token string) bool {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false // not a JWT (e.g. prt_ token)
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if json.Unmarshal(payload, &claims) != nil || claims.Exp == 0 {
+		return false
+	}
+	return time.Now().Unix() >= claims.Exp
+}
 
 // Client is a thin HTTP client for the PR Reviewer API.
 type Client struct {
@@ -48,7 +74,12 @@ func (e *APIError) Error() string {
 // status is converted into an *APIError. body may be nil.
 func (c *Client) request(ctx context.Context, method, path string, query url.Values, body any) ([]byte, error) {
 	if c.token == "" {
-		return nil, fmt.Errorf("not authenticated: run `pr-reviewer-cli auth login --token <token>` or set PR_REVIEWER_TOKEN")
+		return nil, fmt.Errorf("not authenticated: run `prrev auth login`")
+	}
+	// Catch an expired session locally so we don't bother the server with a token
+	// we already know is stale.
+	if tokenExpired(c.token) {
+		return nil, errSessionExpired
 	}
 
 	var reader io.Reader
@@ -88,6 +119,12 @@ func (c *Client) request(ctx context.Context, method, path string, query url.Val
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	// A 401 means the server rejected the token (expired, revoked, or signed with a
+	// different secret). Point the user straight at re-login rather than a bare 401.
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, errSessionExpired
 	}
 
 	if resp.StatusCode >= 400 {

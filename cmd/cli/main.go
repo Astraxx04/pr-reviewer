@@ -1,8 +1,8 @@
-// pr-reviewer-cli — command-line interface for the PR Reviewer service.
+// prrev — command-line interface for the PR Reviewer service.
 //
-// Authentication uses a Bearer token. For CI/automation, mint a long-lived API
-// token (prefix "prt_") with `pr-reviewer-cli tokens create` and supply it via
-// --token, the PR_REVIEWER_TOKEN env var, or `auth login`.
+// Authentication is browser-based: run `prrev auth login` to sign in via GitHub.
+// The resulting token is stored in the config file
+// (~/.config/pr-reviewer/config.json). There is no token-based or env-var login.
 package main
 
 import (
@@ -23,7 +23,6 @@ var version = "dev"
 // Global flags (persistent across all subcommands).
 var (
 	serverFlag  string
-	tokenFlag   string
 	configFlag  string
 	jsonOut     bool
 	timeoutFlag time.Duration
@@ -34,7 +33,7 @@ var apiClient *Client
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "pr-reviewer-cli",
+		Use:           "prrev",
 		Short:         "CLI for the PR Reviewer service",
 		Version:       version,
 		SilenceUsage:  true,
@@ -47,8 +46,7 @@ func newRootCmd() *cobra.Command {
 	}
 
 	pf := root.PersistentFlags()
-	pf.StringVar(&serverFlag, "server", "", "server URL (overrides config / PR_REVIEWER_SERVER)")
-	pf.StringVar(&tokenFlag, "token", "", "bearer token (overrides config / PR_REVIEWER_TOKEN)")
+	pf.StringVar(&serverFlag, "server", "", "server URL (saved to config on login)")
 	pf.StringVar(&configFlag, "config", "", "config file path (default ~/.config/pr-reviewer/config.json)")
 	pf.BoolVar(&jsonOut, "json", false, "output raw JSON instead of tables")
 	pf.DurationVar(&timeoutFlag, "timeout", 30*time.Second, "HTTP request timeout")

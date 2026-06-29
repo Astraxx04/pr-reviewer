@@ -32,8 +32,8 @@ TMP="$(mktemp -d)"
 curl -fsSL "$URL" -o "${TMP}/${ARCHIVE}"
 tar -xzf "${TMP}/${ARCHIVE}" -C "$TMP"
 
-# Install every binary bundled in the archive (server, migrate, cli).
-for bin in pr-reviewer pr-reviewer-migrate pr-reviewer-cli; do
+# Install every binary bundled in the archive (server, migrate, cli=prrev).
+for bin in pr-reviewer pr-reviewer-migrate prrev; do
   if [ -f "${TMP}/${bin}" ]; then
     echo "Installing ${INSTALL_DIR}/${bin}"
     install -m 755 "${TMP}/${bin}" "${INSTALL_DIR}/${bin}"
@@ -44,4 +44,4 @@ rm -rf "$TMP"
 echo ""
 echo "Installation complete."
 echo "  Server:  ${BINARY} --help"
-echo "  CLI:     pr-reviewer-cli --help"
+echo "  CLI:     prrev --help"

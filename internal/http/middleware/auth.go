@@ -94,6 +94,13 @@ func Auth(secret string, db *gorm.DB) func(http.Handler) http.Handler {
 				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 				return
 			}
+			// Pre-auth tokens (issued before the consent screen) are not valid API
+			// credentials — they exist only to complete login at /auth/github/continue.
+			if typ, _ := claims["typ"].(string); typ == "preauth" {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+
 			sub, _ := claims["sub"].(float64)
 			login, _ := claims["login"].(string)
 			role, _ := claims["role"].(string)

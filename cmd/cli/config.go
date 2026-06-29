@@ -14,14 +14,11 @@ type config struct {
 
 const defaultServer = "http://localhost:8001"
 
-// configPath returns the resolved config file path, honouring --config / the
-// PR_REVIEWER_CONFIG env var, then falling back to ~/.config/pr-reviewer/config.json.
+// configPath returns the resolved config file path, honouring --config, then
+// falling back to ~/.config/pr-reviewer/config.json.
 func configPath() string {
 	if configFlag != "" {
 		return configFlag
-	}
-	if env := os.Getenv("PR_REVIEWER_CONFIG"); env != "" {
-		return env
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -55,21 +52,12 @@ func saveConfig(cfg config) error {
 	return os.WriteFile(p, data, 0o600)
 }
 
-// resolveConfig applies precedence: --flag > env var > config file > default.
+// resolveConfig applies precedence: --server flag > config file > default. The
+// token is only ever read from the config file, written by `auth login`.
 func resolveConfig() config {
 	cfg := loadConfig()
-
-	if env := os.Getenv("PR_REVIEWER_SERVER"); env != "" {
-		cfg.Server = env
-	}
-	if env := os.Getenv("PR_REVIEWER_TOKEN"); env != "" {
-		cfg.Token = env
-	}
 	if serverFlag != "" {
 		cfg.Server = serverFlag
-	}
-	if tokenFlag != "" {
-		cfg.Token = tokenFlag
 	}
 	return cfg
 }

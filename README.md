@@ -61,7 +61,7 @@ findings → post review + commit status to GitHub → persist → notify.**
 | Path | Responsibility |
 |------|----------------|
 | `cmd/server` | Application entrypoint and job-worker registration |
-| `cmd/cli` | `pr-reviewer-cli` — auth, repos, reviews, tokens, providers |
+| `cmd/cli` | `prrev` — auth, repos, reviews, tokens, providers |
 | `cmd/migrate` / `cmd/seed` | Database migrations and sample-data seeding |
 | `internal/ai` | Agents, LLM provider registry/adapters, RAG, embeddings, MCP contracts |
 | `internal/github` | GitHub API adapter (PRs, diffs, comments, commit status) |
@@ -169,14 +169,25 @@ Then in your GitHub repo, go to **Settings → Webhooks → Add webhook**:
 
 ## CLI
 
-A `pr-reviewer-cli` is included for CI/automation and local use. It authenticates with a
-Bearer token (mint a long-lived API token in the dashboard for CI) and supports managing
-repos, reviews, tokens, and providers.
+`prrev` is a command-line client for managing repos, reviews, tokens, and providers. It
+**signs in through your browser** (GitHub OAuth) and stores the resulting token in
+`~/.config/pr-reviewer/config.json` — there is no token-paste or env-var login.
 
 ```bash
-go build -o pr-reviewer-cli ./cmd/cli
-./pr-reviewer-cli --help
+# Install a release (also installs the server binaries):
+curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh
+
+# …or build from source:
+go build -o bin/prrev ./cmd/cli
+
+# Sign in and go:
+prrev auth login --server https://your-server
+prrev whoami
 ```
+
+See [`docs/trying-the-cli.md`](docs/trying-the-cli.md) for the full walkthrough. For
+**CI/automation** (no browser), mint an API token with `prrev tokens create` and send it as
+an `Authorization: Bearer` header to the API directly.
 
 ---
 

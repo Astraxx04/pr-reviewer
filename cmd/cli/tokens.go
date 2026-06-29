@@ -88,7 +88,7 @@ func newTokensCreateCmd() *cobra.Command {
 			fmt.Printf("API token created (scope: %s).\n", res.Scope)
 			fmt.Printf("\n    %s\n\n", res.Token)
 			fmt.Println("This is the only time the token is shown — store it securely.")
-			fmt.Println("Use it with: --token <token>  or  export PR_REVIEWER_TOKEN=<token>")
+			fmt.Println("Use it as a Bearer token in the Authorization header for API access.")
 			return nil
 		},
 	}

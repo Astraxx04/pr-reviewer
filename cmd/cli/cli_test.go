@@ -49,9 +49,7 @@ func TestParsePRRef(t *testing.T) {
 
 // resetFlags clears the global flag state between tests.
 func resetFlags() {
-	serverFlag, tokenFlag, configFlag = "", "", ""
-	_ = os.Unsetenv("PR_REVIEWER_SERVER")
-	_ = os.Unsetenv("PR_REVIEWER_TOKEN")
+	serverFlag, configFlag = "", ""
 }
 
 func TestResolveConfigPrecedence(t *testing.T) {
@@ -70,28 +68,18 @@ func TestResolveConfigPrecedence(t *testing.T) {
 		}
 	})
 
-	t.Run("env overrides file", func(t *testing.T) {
+	t.Run("server flag overrides file; token stays from file", func(t *testing.T) {
 		resetFlags()
 		configFlag = cfgFile
-		_ = os.Setenv("PR_REVIEWER_SERVER", "http://env:2")
-		_ = os.Setenv("PR_REVIEWER_TOKEN", "env-tok")
-		defer resetFlags()
-		cfg := resolveConfig()
-		if cfg.Server != "http://env:2" || cfg.Token != "env-tok" {
-			t.Errorf("got %+v", cfg)
-		}
-	})
-
-	t.Run("flag overrides env and file", func(t *testing.T) {
-		resetFlags()
-		configFlag = cfgFile
-		_ = os.Setenv("PR_REVIEWER_SERVER", "http://env:2")
 		serverFlag = "http://flag:3"
-		tokenFlag = "flag-tok"
 		defer resetFlags()
 		cfg := resolveConfig()
-		if cfg.Server != "http://flag:3" || cfg.Token != "flag-tok" {
-			t.Errorf("got %+v", cfg)
+		if cfg.Server != "http://flag:3" {
+			t.Errorf("server = %q, want http://flag:3", cfg.Server)
+		}
+		// The token is only ever sourced from the config file.
+		if cfg.Token != "file-tok" {
+			t.Errorf("token = %q, want file-tok", cfg.Token)
 		}
 	})
 

@@ -1,11 +1,15 @@
-# Trying the CLI (`pr-reviewer-cli`)
+# Trying the CLI (`prrev`)
 
-A hands-on, step-by-step guide to building the CLI, authenticating, and running
-your first commands against a local server.
+A hands-on, step-by-step guide to building the CLI, signing in, and running your
+first commands against a local server.
 
-> **The CLI is a thin client over the HTTP API.** It does nothing on its own —
-> it needs a running backend to talk to. So the flow is: start the backend →
-> build the CLI → get a token → point the CLI at the server.
+> **The CLI is a thin client over the HTTP API.** It does nothing on its own — it
+> needs a running backend to talk to. So the flow is: start the backend → build
+> the CLI → `auth login` (browser) → run commands.
+
+> **Authentication is browser-only.** You sign in through GitHub in your browser;
+> the CLI captures the resulting token and stores it in its config file. There is
+> **no** token-paste login and **no** environment-variable login.
 
 ---
 
@@ -16,33 +20,41 @@ your first commands against a local server.
 | Go 1.25+ | to build the CLI and server |
 | PostgreSQL 16 + pgvector | the backend's datastore |
 | A running backend (`cmd/server`) | the CLI has no local mode |
-| A bearer token | every API call is authenticated |
+| A GitHub OAuth App + a browser | the only way to authenticate |
 
 If you just want to *see the commands* without a server, jump to
 [Appendix A: explore without a server](#appendix-a-explore-the-cli-without-a-server).
 
 ---
 
-## 1. Build the CLI
+## 1. Install the CLI (`prrev`)
 
-From the project root:
+Pick one:
+
+**a) Quick install from a release (recommended for users)** — downloads the right
+prebuilt binary and installs `prrev` (plus the server binaries) to
+`/usr/local/bin`:
 
 ```bash
-go build -o bin/pr-reviewer-cli ./cmd/cli
+curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh
+```
+
+**b) Build from source (for development)** — from the project root:
+
+```bash
+go build -o bin/prrev ./cmd/cli
+sudo cp bin/prrev /usr/local/bin/    # optional: put it on your PATH
 ```
 
 Verify it runs:
 
 ```bash
-./bin/pr-reviewer-cli --help
-./bin/pr-reviewer-cli --version
+prrev --help
+prrev --version
 ```
 
-> Optional: put it on your PATH so you can type `pr-reviewer-cli` anywhere:
-> ```bash
-> sudo cp bin/pr-reviewer-cli /usr/local/bin/
-> ```
-> The rest of this guide assumes `./bin/pr-reviewer-cli`.
+> If you didn't put it on your PATH, run it as `./bin/prrev` instead of `prrev`
+> throughout this guide.
 
 ---
 
@@ -64,7 +76,8 @@ docker run -d \
 
 **b) Make sure `.env` has the required secrets** (see `docs/running-locally.md`
 for the full list). Minimum for the CLI to work: `DATABASE_URL`, `JWT_SECRET`,
-`ENCRYPTION_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVER_PORT`.
+`ENCRYPTION_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVER_PORT`,
+`SERVER_URL`.
 
 **c) Run the server** (it auto-migrates the schema on startup):
 
@@ -88,109 +101,128 @@ curl http://localhost:8001/healthz    # -> {"status":"ok","db":"ok",...}
 
 ---
 
-## 3. Get a token
+## 3. Sign in (browser OAuth — the only way)
 
-Every CLI command sends `Authorization: Bearer <token>`. There are two kinds of
-token, and you bootstrap the second from the first.
-
-### 3a. Get a JWT by logging in via the browser
-
-The backend authenticates humans through **GitHub OAuth**, and hands the JWT to
-the frontend. Easiest path:
-
-1. Start the frontend too (`cd web && npm install && npm run dev`) and open
-   <http://localhost:3000>.
-2. Log in with GitHub. After the OAuth round-trip the backend redirects to
-   `http://localhost:3000/auth/callback?token=<JWT>`.
-3. Grab that JWT — either copy it straight from the URL bar during the redirect,
-   or open DevTools → Application → Local Storage and copy the stored token.
-
-This JWT works as a bearer token immediately (it expires after `JWT_TTL_HOURS`,
-default 24h).
-
-### 3b. (Recommended) Mint a long-lived API token
-
-JWTs expire. For a durable token (prefix `prt_`), use the JWT once to create an
-API token. **Note:** token management is admin-only, so your user must have the
-`owner`/`admin` role.
+Run `auth login`. The CLI prints a sign-in URL, opens your browser, you authorize
+with GitHub, approve the consent screen, and the CLI captures the token
+automatically over a localhost loopback and saves it to
+`~/.config/pr-reviewer/config.json`. No copy-paste, no tokens, no env vars.
 
 ```bash
-./bin/pr-reviewer-cli tokens create \
-  --server http://localhost:8001 \
-  --token <JWT-from-step-3a> \
-  --name "my-laptop" \
-  --scope readwrite
+prrev auth login --server <SERVER_URL>
 ```
 
-The raw `prt_…` token is printed **once** — copy it now. Use it everywhere the
-JWT was used below.
+> ⚠️ **`--server` must match the server's `SERVER_URL`** — the address GitHub
+> redirects back to — because the OAuth state cookie has to round-trip on a single
+> domain. For plain local dev that's `http://localhost:8001`. **Behind a tunnel
+> (ngrok) or a reverse proxy, use the public URL**, e.g.
+> `--server https://your-tunnel.ngrok-free.dev`. Pointing at `localhost` while
+> `SERVER_URL` is the tunnel causes an `invalid state` error (see Troubleshooting).
+
+What happens:
+
+1. The terminal prints the sign-in URL and tries to open your browser:
+   ```
+   To sign in with GitHub, open this URL in your browser:
+
+       <SERVER_URL>/auth/github?cli_redirect=http://127.0.0.1:54321/callback
+
+   Trying to open it automatically... opened.
+   Waiting for authentication to complete (Ctrl-C to cancel)...
+   ```
+2. You authorize with GitHub (you'll only see GitHub's own login/consent if you're
+   signed out or haven't authorized the app before).
+3. **The app's consent screen** appears — *"Authorize sign-in — You're signing in
+   as `<you>` — [Yes, continue]"*. Click **Yes, continue**.
+4. The browser tab confirms success and the terminal prints, e.g.:
+   ```
+   Logged in to <SERVER_URL> as Astraxx04 (owner)
+   ```
+
+That's it — every later command works without any flags. Confirm with:
+
+```bash
+prrev auth whoami
+```
+
+### Good to know
+
+- **The consent screen shows on *every* login**, even when GitHub silently
+  re-approves an already-authorized app — it's the app's own explicit "yes, this
+  is me" step. Nothing is created until you click it.
+- **Reloading the consent page is safe** (it's valid for 5 minutes). Do **not**
+  reload the GitHub *callback* URL — that's single-use and a refresh will fail with
+  `invalid state`. The flow redirects you off it automatically.
+- **CLI tokens last 7 days.** When yours expires, the next command tells you
+  exactly what to do:
+  ```
+  Error: session expired — run: prrev auth login
+  ```
+  Just `auth login` again.
+- **Security:** the server only ever returns the token to a **localhost** address
+  (`127.0.0.1`/`localhost`/`::1`). A crafted redirect to any other host is
+  rejected, so the token can't be exfiltrated off your machine.
+- **No browser? (CI / headless / SSH)** This flow needs a browser. For headless
+  automation, use an API token via the HTTP API directly (next section) rather than
+  this CLI.
 
 ---
 
-## 4. Log in (save server + token)
+## 4. (Optional) API tokens for external tools
 
-Persist the server URL and token to `~/.config/pr-reviewer/config.json` so you
-don't have to pass `--server`/`--token` on every command:
-
-```bash
-./bin/pr-reviewer-cli auth login \
-  --server http://localhost:8001 \
-  --token <prt_or_JWT>
-```
-
-It verifies the token against `/api/auth/me` and prints, e.g.:
-
-```
-Logged in to http://localhost:8001 as alice (owner)
-```
-
-Confirm any time with:
+Need a long-lived credential for **CI or other programmatic clients** that call
+the API directly? Mint an API token (prefix `prt_`). This is **not** used to log in
+this CLI — it's for sending `Authorization: Bearer <token>` to the API from your
+own scripts. Token management is admin-only (`owner`/`admin` role):
 
 ```bash
-./bin/pr-reviewer-cli auth whoami
+# You must be logged in (section 3) first.
+prrev tokens create --name "ci-pipeline" --scope readwrite
 ```
 
-> **Alternative to a config file:** set environment variables instead.
-> ```bash
-> export PR_REVIEWER_SERVER=http://localhost:8001
-> export PR_REVIEWER_TOKEN=prt_xxx
-> ```
-> Precedence is: `--flag` > env var > config file > default.
+The raw `prt_…` token is printed **once** — copy it and store it securely. Use it
+in your own HTTP calls, e.g.:
+
+```bash
+curl -H "Authorization: Bearer prt_xxx" <SERVER_URL>/api/reviews
+```
+
+Manage them with `tokens list` and `tokens revoke <id>`.
 
 ---
 
 ## 5. Run your first commands
 
-Once logged in, drop the `--server`/`--token` flags:
+Once logged in, no flags are needed:
 
 ```bash
 # Who am I?
-./bin/pr-reviewer-cli auth whoami
+prrev auth whoami
 
 # Repositories the server is tracking
-./bin/pr-reviewer-cli repos list
+prrev repos list
 
 # Pull requests and their review history
-./bin/pr-reviewer-cli prs list
-./bin/pr-reviewer-cli prs get demo-org/api-service#42
+prrev prs list
+prrev prs get demo-org/api-service#42
 
 # Reviews
-./bin/pr-reviewer-cli reviews list
-./bin/pr-reviewer-cli reviews get 1
+prrev reviews list
+prrev reviews get 1
 
 # Aggregate stats
-./bin/pr-reviewer-cli dashboard stats
+prrev dashboard stats
 
 # Configured AI providers + health
-./bin/pr-reviewer-cli providers list
-./bin/pr-reviewer-cli providers health
+prrev providers list
+prrev providers health
 ```
 
-Trigger an actual AI re-review of a PR (needs a configured provider + GitHub
-token in **Settings → Providers / GitHub App**):
+Trigger an actual AI re-review of a PR (needs a configured provider + GitHub token
+in **Settings → Providers / GitHub App**):
 
 ```bash
-./bin/pr-reviewer-cli prs re-review demo-org/api-service#42
+prrev prs re-review demo-org/api-service#42
 ```
 
 ---
@@ -200,16 +232,15 @@ token in **Settings → Providers / GitHub App**):
 | Flag | Effect |
 |------|--------|
 | `--json` | Raw JSON instead of formatted tables (great for piping to `jq`) |
-| `--server <url>` | Override the server for one command |
-| `--token <tok>` | Override the token for one command |
+| `--server <url>` | Server URL; on `auth login` it's saved to the config file |
 | `--timeout 60s` | Bump the HTTP timeout for slow operations |
 | `--config <path>` | Use a different config file |
 
 Example — export reviews to CSV and inspect JSON:
 
 ```bash
-./bin/pr-reviewer-cli reviews export --out reviews.csv
-./bin/pr-reviewer-cli repos list --json | jq '.[].full_name'
+prrev reviews export --out reviews.csv
+prrev repos list --json | jq '.[].full_name'
 ```
 
 ---
@@ -218,7 +249,8 @@ Example — export reviews to CSV and inspect JSON:
 
 | Group | Command | Description |
 |-------|---------|-------------|
-| **auth** | `login` / `whoami` / `logout` | authenticate and inspect identity |
+| **auth** | `login` | sign in via the browser (GitHub OAuth) |
+| | `whoami` / `logout` | show identity / revoke session and clear stored token |
 | **repos** | `list` | list tracked repositories |
 | | `enable <id>` / `disable <id>` | toggle reviewing for a repo |
 | | `sync` | sync repos from the GitHub App installation |
@@ -232,12 +264,12 @@ Example — export reviews to CSV and inspect JSON:
 | | `export` | export reviews as CSV |
 | **providers** | `list` / `test <id>` / `health` | manage AI providers |
 | **dashboard** | `stats` | review + repo summary statistics |
-| **tokens** | `list` / `create` / `revoke <id>` | manage API tokens (admin) |
+| **tokens** | `list` / `create` / `revoke <id>` | manage API tokens for external clients (admin) |
 
 Get help on any command with `--help`, e.g.:
 
 ```bash
-./bin/pr-reviewer-cli prs re-review --help
+prrev prs re-review --help
 ```
 
 ---
@@ -246,12 +278,14 @@ Get help on any command with `--help`, e.g.:
 
 | Symptom | Cause / Fix |
 |---------|-------------|
-| `not authenticated: run auth login...` | No token resolved. Pass `--token`, set `PR_REVIEWER_TOKEN`, or `auth login`. |
-| `server returned 401` | Token expired (JWT) or revoked. Re-login or mint a fresh `prt_` token. |
+| `not authenticated: run prrev auth login` | No token in the config file — run `auth login`. |
+| `session expired — run: prrev auth login` | Your 7-day CLI token expired or was revoked — log in again. |
+| `invalid state` (in the browser) | You reloaded the single-use GitHub *callback* URL, **or** `--server` didn't match the server's `SERVER_URL` (cookie domain mismatch). Use the `SERVER_URL` host and don't refresh the callback. |
+| `invalid or expired login request` (consent page) | The 5-minute pre-auth window lapsed — run `auth login` again. |
+| ngrok "You are about to visit…" interstitial | Click **Visit Site**; the flow continues. |
 | `server returned 403` | Your user lacks the role for that action (e.g. `tokens` is admin-only). |
-| Connection refused | Backend not running, or wrong port — remember it's **8001**. |
+| Connection refused | Backend not running, or wrong port — it's **8001**, not 8080. |
 | Empty lists everywhere | No data yet — run `make seed`, or connect a real repo + open a PR. |
-| `token verification failed` | Wrong `--server`, or token minted against a different `JWT_SECRET`. |
 
 ---
 
@@ -262,9 +296,9 @@ need a backend:
 
 ```bash
 go run ./cmd/cli --help
+go run ./cmd/cli auth login --help
 go run ./cmd/cli prs --help
 go run ./cmd/cli reviews --help
-go run ./cmd/cli tokens create --help
 ```
 
 This is the fastest way to see what's available before standing up Postgres and

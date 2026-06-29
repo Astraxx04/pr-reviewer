@@ -42,7 +42,7 @@ builds:
 
   - id: cli
     main: ./cmd/cli
-    binary: pr-reviewer-cli
+    binary: prrev
     env:
       - CGO_ENABLED=0
     goos:
