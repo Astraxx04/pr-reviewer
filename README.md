@@ -174,7 +174,13 @@ Then in your GitHub repo, go to **Settings → Webhooks → Add webhook**:
 `~/.config/pr-reviewer/config.json` — there is no token-paste or env-var login.
 
 ```bash
-# Install a release (also installs the server binaries):
+# Homebrew (macOS):
+brew install Astraxx04/tap/prrev
+
+# go install:
+go install github.com/Astraxx04/pr-reviewer/cmd/prrev@latest
+
+# release one-liner (also installs the server binaries):
 curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh
 
 # …or build from source:

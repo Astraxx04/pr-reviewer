@@ -31,15 +31,26 @@ If you just want to *see the commands* without a server, jump to
 
 Pick one:
 
-**a) Quick install from a release (recommended for users)** — downloads the right
-prebuilt binary and installs `prrev` (plus the server binaries) to
-`/usr/local/bin`:
+**a) Homebrew (macOS):**
+
+```bash
+brew install Astraxx04/tap/prrev
+```
+
+**b) `go install`:**
+
+```bash
+go install github.com/Astraxx04/pr-reviewer/cmd/prrev@latest
+```
+
+**c) Release one-liner** — downloads the right prebuilt binary and installs
+`prrev` (plus the server binaries) to `/usr/local/bin`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh
 ```
 
-**b) Build from source (for development)** — from the project root:
+**d) Build from source (for development)** — from the project root:
 
 ```bash
 go build -o bin/prrev ./cmd/prrev
