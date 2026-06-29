@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.
 **b) Build from source (for development)** — from the project root:
 
 ```bash
-go build -o bin/prrev ./cmd/cli
+go build -o bin/prrev ./cmd/prrev
 sudo cp bin/prrev /usr/local/bin/    # optional: put it on your PATH
 ```
 
@@ -295,10 +295,10 @@ You can browse the entire command tree offline — only commands that hit the AP
 need a backend:
 
 ```bash
-go run ./cmd/cli --help
-go run ./cmd/cli auth login --help
-go run ./cmd/cli prs --help
-go run ./cmd/cli reviews --help
+go run ./cmd/prrev --help
+go run ./cmd/prrev auth login --help
+go run ./cmd/prrev prs --help
+go run ./cmd/prrev reviews --help
 ```
 
 This is the fastest way to see what's available before standing up Postgres and

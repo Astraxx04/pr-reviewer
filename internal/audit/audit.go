@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 // Log writes one audit entry. Non-fatal: if db is nil or write fails, silently continues.

@@ -10,12 +10,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"pr-reviewer/internal/ai"
-	gh "pr-reviewer/internal/github"
-	prHttp "pr-reviewer/internal/http"
-	"pr-reviewer/internal/pr"
-	"pr-reviewer/internal/review"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/ai"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	prHttp "github.com/Astraxx04/pr-reviewer/internal/http"
+	"github.com/Astraxx04/pr-reviewer/internal/pr"
+	"github.com/Astraxx04/pr-reviewer/internal/review"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 const secret = "test-secret"

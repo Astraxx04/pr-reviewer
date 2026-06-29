@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Astraxx04/pr-reviewer/internal/ai/llm"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
-	"pr-reviewer/internal/ai/llm"
-	"pr-reviewer/pkg/logger"
 )
 
 type openaiAdapter struct {

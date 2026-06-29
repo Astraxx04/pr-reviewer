@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 // costPerInputToken and costPerOutputToken are rough average estimates in USD per token.
@@ -101,11 +101,11 @@ func (h *AnalyticsHandler) Cost(w http.ResponseWriter, r *http.Request) {
 
 	totalEst := float64(totals.InputTokens)*costPerInputToken + float64(totals.OutputTokens)*costPerOutputToken
 	writeJSON(w, http.StatusOK, map[string]any{
-		"days":           days,
-		"input_tokens":   totals.InputTokens,
-		"output_tokens":  totals.OutputTokens,
-		"est_cost_usd":   roundCents(totalEst),
-		"by_repo":        repoStats,
+		"days":          days,
+		"input_tokens":  totals.InputTokens,
+		"output_tokens": totals.OutputTokens,
+		"est_cost_usd":  roundCents(totalEst),
+		"by_repo":       repoStats,
 	})
 }
 

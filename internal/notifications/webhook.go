@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // WebhookPayload is the JSON body POSTed to an outbound webhook endpoint.

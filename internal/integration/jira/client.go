@@ -12,9 +12,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 var ticketRe = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9}-\d+)\b`)

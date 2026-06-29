@@ -18,10 +18,10 @@ import (
 	githuboauth "golang.org/x/oauth2/github"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	"pr-reviewer/internal/http/middleware"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
+	"github.com/Astraxx04/pr-reviewer/internal/http/middleware"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 type AuthHandler struct {

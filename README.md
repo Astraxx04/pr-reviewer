@@ -61,7 +61,7 @@ findings → post review + commit status to GitHub → persist → notify.**
 | Path | Responsibility |
 |------|----------------|
 | `cmd/server` | Application entrypoint and job-worker registration |
-| `cmd/cli` | `prrev` — auth, repos, reviews, tokens, providers |
+| `cmd/prrev` | `prrev` — auth, repos, reviews, tokens, providers |
 | `cmd/migrate` / `cmd/seed` | Database migrations and sample-data seeding |
 | `internal/ai` | Agents, LLM provider registry/adapters, RAG, embeddings, MCP contracts |
 | `internal/github` | GitHub API adapter (PRs, diffs, comments, commit status) |
@@ -178,7 +178,7 @@ Then in your GitHub repo, go to **Settings → Webhooks → Add webhook**:
 curl -fsSL https://raw.githubusercontent.com/Astraxx04/pr-reviewer/main/install.sh | sh
 
 # …or build from source:
-go build -o bin/prrev ./cmd/cli
+go build -o bin/prrev ./cmd/prrev
 
 # Sign in and go:
 prrev auth login --server https://your-server

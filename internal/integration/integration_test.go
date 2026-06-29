@@ -14,11 +14,11 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	"pr-reviewer/internal/http/handlers"
-	prHttp "pr-reviewer/internal/http"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
+	prHttp "github.com/Astraxx04/pr-reviewer/internal/http"
+	"github.com/Astraxx04/pr-reviewer/internal/http/handlers"
 )
 
 // gormDB is initialised once in TestMain and shared across all tests.

@@ -9,9 +9,9 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/jobs"
-	"pr-reviewer/internal/notifications"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/jobs"
+	"github.com/Astraxx04/pr-reviewer/internal/notifications"
 )
 
 type NotificationHandler struct {
@@ -294,4 +294,3 @@ func sendTestNotification(ctx context.Context, cfg models.NotificationConfig, fa
 type testErr struct{ msg string }
 
 func (e *testErr) Error() string { return e.msg }
-

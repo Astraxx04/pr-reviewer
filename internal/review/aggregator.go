@@ -3,8 +3,8 @@ package review
 import (
 	"context"
 
-	"pr-reviewer/internal/ai"
-	"pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/ai"
+	"github.com/Astraxx04/pr-reviewer/internal/github"
 )
 
 type Aggregator interface {

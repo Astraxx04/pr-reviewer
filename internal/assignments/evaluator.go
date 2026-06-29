@@ -6,10 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/internal/pr"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/pr"
 )
 
 type Result struct {

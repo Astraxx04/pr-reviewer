@@ -10,9 +10,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // SlackChannelConfig is the JSON shape stored in NotificationConfig.Config for channel="slack".
@@ -166,8 +166,8 @@ func (s *notifService) NotifyReviewComplete(ctx context.Context, repoID uint, pr
 				shouldNotifyComplete(wc.Events, wc.ScoreThreshold, score, isReReview) {
 				_ = PostWebhook(ctx, wc.URL, DecryptSecret(wc.Secret), WebhookPayload{
 					Event: EventReviewComplete, Score: score,
-					PR:     map[string]any{"title": prTitle, "url": prURL},
-					Review: map[string]any{"summary": summary, "score": score},
+					PR:        map[string]any{"title": prTitle, "url": prURL},
+					Review:    map[string]any{"summary": summary, "score": score},
 					Timestamp: time.Now(),
 				})
 			}
@@ -194,4 +194,3 @@ func PostSlack(ctx context.Context, webhookURL, text string) error {
 	}
 	return nil
 }
-

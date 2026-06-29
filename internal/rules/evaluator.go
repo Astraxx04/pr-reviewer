@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	gh "pr-reviewer/internal/github"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 )
 
 // Evaluate runs all rules against the diff and returns formatted violation strings.

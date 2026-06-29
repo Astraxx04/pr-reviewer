@@ -12,11 +12,11 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	slackint "pr-reviewer/internal/integration/slack"
-	"pr-reviewer/internal/jobs"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	slackint "github.com/Astraxx04/pr-reviewer/internal/integration/slack"
+	"github.com/Astraxx04/pr-reviewer/internal/jobs"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // SlackAppHandler serves both the admin config endpoints (JWT-protected) and the

@@ -7,8 +7,8 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
 )
 
 type AssignmentHandler struct {

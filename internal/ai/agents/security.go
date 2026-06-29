@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"pr-reviewer/internal/ai/llm"
-	"pr-reviewer/internal/ai/mcp"
-	"pr-reviewer/internal/metrics"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/llm"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/mcp"
+	"github.com/Astraxx04/pr-reviewer/internal/metrics"
 )
 
 const securitySystem = `You are a security engineer reviewing a pull request diff.

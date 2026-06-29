@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type DashboardHandler struct{ db *gorm.DB }
@@ -29,12 +29,12 @@ func (h *DashboardHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	h.db.WithContext(r.Context()).Model(&models.Repository{}).Where("enabled = true").Count(&enabledRepos)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"total_reviews":  totalReviews,
-		"avg_score":      avgScore,
-		"approvals":      approvals,
+		"total_reviews":   totalReviews,
+		"avg_score":       avgScore,
+		"approvals":       approvals,
 		"request_changes": changes,
-		"comments":       comments,
-		"total_repos":    totalRepos,
-		"enabled_repos":  enabledRepos,
+		"comments":        comments,
+		"total_repos":     totalRepos,
+		"enabled_repos":   enabledRepos,
 	})
 }

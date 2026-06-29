@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/repo"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
 )
 
 type UserHandler struct {

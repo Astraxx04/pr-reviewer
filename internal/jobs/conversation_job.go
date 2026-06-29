@@ -9,11 +9,11 @@ import (
 	"github.com/riverqueue/river"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/ai"
-	"pr-reviewer/internal/ai/mcp"
-	"pr-reviewer/internal/db/models"
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/ai"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/mcp"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // ConversationJobArgs is the payload for a conversational re-review job.

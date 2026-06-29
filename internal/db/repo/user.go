@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type UserRepo struct{ db *gorm.DB }

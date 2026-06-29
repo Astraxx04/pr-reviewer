@@ -23,7 +23,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
 
-	"pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
 )
 
 func main() {

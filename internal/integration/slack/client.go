@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 var httpClient = &http.Client{Timeout: 8 * time.Second}

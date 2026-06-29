@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 func Connect(dsn string) (*gorm.DB, error) {

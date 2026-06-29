@@ -5,8 +5,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/ai"
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/ai"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type ExplainHandler struct {

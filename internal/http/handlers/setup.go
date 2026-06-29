@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type SetupHandler struct {
@@ -19,9 +19,9 @@ func NewSetupHandler(db *gorm.DB) *SetupHandler {
 }
 
 type setupStatus struct {
-	DatabaseOK     bool `json:"database_ok"`
+	DatabaseOK       bool `json:"database_ok"`
 	GithubConfigured bool `json:"github_configured"`
-	SetupComplete  bool `json:"setup_complete"`
+	SetupComplete    bool `json:"setup_complete"`
 }
 
 func (h *SetupHandler) Status(w http.ResponseWriter, r *http.Request) {

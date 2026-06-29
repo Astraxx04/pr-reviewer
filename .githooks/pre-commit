@@ -25,8 +25,9 @@ if [ -n "$go_changed" ]; then
   echo "▶ gofmt (staged Go files)"
   unformatted="$(gofmt -l $go_changed 2>/dev/null || true)"
   if [ -n "$unformatted" ]; then
-    echo "✗ these files need formatting — run: gofmt -w $unformatted"
-    fail=1
+    echo "  auto-formatting: $unformatted"
+    gofmt -w $unformatted
+    git add $unformatted
   fi
 
   echo "▶ go vet ./..."

@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/http/handlers"
-	"pr-reviewer/internal/http/middleware"
+	"github.com/Astraxx04/pr-reviewer/internal/http/handlers"
+	"github.com/Astraxx04/pr-reviewer/internal/http/middleware"
 )
 
 // WebhookHandlerIface is satisfied by WebhookHandler and InProcessWebhookHandler.

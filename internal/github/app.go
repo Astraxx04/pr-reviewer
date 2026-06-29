@@ -14,7 +14,7 @@ import (
 	gogithub "github.com/google/go-github/v69/github"
 	"golang.org/x/oauth2"
 
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // RepoInfo is a minimal repository description returned during installation syncs.

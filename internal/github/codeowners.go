@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 type CODEOWNERSRule struct {

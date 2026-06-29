@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type ReviewHandler struct{ db *gorm.DB }
@@ -27,9 +27,9 @@ func (h *ReviewHandler) List(w http.ResponseWriter, r *http.Request) {
 		Order("created_at desc").Offset(offset).Limit(perPage).Find(&reviews)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"reviews": reviews,
-		"total":   total,
-		"page":    page,
+		"reviews":  reviews,
+		"total":    total,
+		"page":     page,
 		"per_page": perPage,
 	})
 }

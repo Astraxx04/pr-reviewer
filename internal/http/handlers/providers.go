@@ -9,11 +9,11 @@ import (
 
 	"gorm.io/gorm"
 
-	dbpkg "pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	"pr-reviewer/internal/ai/llm"
-	"pr-reviewer/internal/ai/llm/adapters"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/llm"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/llm/adapters"
+	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
 )
 
 // providerPresetBaseURLs maps named preset provider types to their base URLs.
@@ -237,7 +237,7 @@ func (h *ProviderHandler) Test(w http.ResponseWriter, r *http.Request) {
 // an existing provider id to reuse its stored, encrypted key.
 func (h *ProviderHandler) ListModels(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ID      uint   `json:"id"`       // optional: use a stored provider's saved key
+		ID      uint   `json:"id"` // optional: use a stored provider's saved key
 		Type    string `json:"type"`
 		BaseURL string `json:"base_url"`
 		APIKey  string `json:"api_key"`
@@ -302,14 +302,14 @@ func (h *ProviderHandler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type healthEntry struct {
-		ProviderID   uint      `json:"provider_id"`
-		ProviderName string    `json:"provider_name"`
-		ProviderType string    `json:"provider_type"`
+		ProviderID   uint       `json:"provider_id"`
+		ProviderName string     `json:"provider_name"`
+		ProviderType string     `json:"provider_type"`
 		LastTestedAt *time.Time `json:"last_tested_at"`
-		LatencyMS    *int64    `json:"latency_ms"`
-		OK           *bool     `json:"ok"`
-		ErrorMsg     string    `json:"error_msg,omitempty"`
-		Status       string    `json:"status"` // healthy | degraded | unreachable | untested
+		LatencyMS    *int64     `json:"latency_ms"`
+		OK           *bool      `json:"ok"`
+		ErrorMsg     string     `json:"error_msg,omitempty"`
+		Status       string     `json:"status"` // healthy | degraded | unreachable | untested
 	}
 
 	out := make([]healthEntry, 0, len(providers))

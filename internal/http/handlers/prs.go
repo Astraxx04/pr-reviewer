@@ -10,9 +10,9 @@ import (
 	"github.com/riverqueue/river/rivertype"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/internal/jobs"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/jobs"
 )
 
 // prEnqueuer is the subset of river.Client used to trigger re-reviews.
@@ -75,7 +75,7 @@ func (h *PRHandler) List(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * perPage
 
 	q := r.URL.Query()
-	repoFilter := q.Get("repo")   // "owner/name"
+	repoFilter := q.Get("repo") // "owner/name"
 	authorFilter := q.Get("author")
 	statusFilter := q.Get("status") // approved | changes_requested | commented | pending
 
@@ -294,17 +294,17 @@ func (h *PRHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":               pr.ID,
-		"number":           pr.Number,
-		"title":            pr.Title,
-		"author":           pr.Author,
-		"repo":             owner + "/" + repoName,
-		"head_sha":         pr.HeadSHA,
-		"pr_status":        prStatus(currentStatus),
-		"reviews":          reviewSummaries,
-		"latest_comments":  latestComments,
-		"assignees":        assignees,
-		"created_at":       pr.CreatedAt,
+		"id":              pr.ID,
+		"number":          pr.Number,
+		"title":           pr.Title,
+		"author":          pr.Author,
+		"repo":            owner + "/" + repoName,
+		"head_sha":        pr.HeadSHA,
+		"pr_status":       prStatus(currentStatus),
+		"reviews":         reviewSummaries,
+		"latest_comments": latestComments,
+		"assignees":       assignees,
+		"created_at":      pr.CreatedAt,
 	})
 }
 

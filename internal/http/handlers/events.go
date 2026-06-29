@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"pr-reviewer/internal/events"
+	"github.com/Astraxx04/pr-reviewer/internal/events"
 )
 
 // EventsHandler streams server-sent events to authenticated clients.

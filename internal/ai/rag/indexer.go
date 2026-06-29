@@ -8,8 +8,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/ai/embeddings"
-	gh "pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/embeddings"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 )
 
 // Indexer embeds and persists code chunks and review comments for future RAG retrieval.

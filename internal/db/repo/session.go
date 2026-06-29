@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type SessionRepo struct{ db *gorm.DB }

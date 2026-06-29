@@ -6,7 +6,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	gh "pr-reviewer/internal/github"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 )
 
 // Rule defines a custom pattern to flag in diffs.

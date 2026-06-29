@@ -12,8 +12,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/audit"
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type APITokenHandler struct{ db *gorm.DB }

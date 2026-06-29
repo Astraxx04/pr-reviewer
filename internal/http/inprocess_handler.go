@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"strings"
 
-	"pr-reviewer/internal/ai"
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/internal/pr"
-	"pr-reviewer/internal/review"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/ai"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/pr"
+	"github.com/Astraxx04/pr-reviewer/internal/review"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // InProcessWebhookHandler is a fallback for local development when no database is configured.
@@ -73,8 +73,10 @@ func (h *InProcessWebhookHandler) Handle(w http.ResponseWriter, r *http.Request)
 		PullRequest struct {
 			Base struct {
 				Repo struct {
-					Owner struct{ Login string `json:"login"` } `json:"owner"`
-					Name  string                                `json:"name"`
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+					Name string `json:"name"`
 				} `json:"repo"`
 			} `json:"base"`
 		} `json:"pull_request"`

@@ -10,10 +10,10 @@ import (
 	"github.com/riverqueue/river/rivertype"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/audit"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/jobs"
-	"pr-reviewer/internal/notifications"
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/jobs"
+	"github.com/Astraxx04/pr-reviewer/internal/notifications"
 )
 
 // JobEnqueuer is the subset of river.Client the handler needs.

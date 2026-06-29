@@ -11,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type AuthUser struct {

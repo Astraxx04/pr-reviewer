@@ -3,7 +3,7 @@ package notifications
 import (
 	"encoding/json"
 
-	dbpkg "pr-reviewer/internal/db"
+	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
 )
 
 // encryptionKey is the AES key (hex) used to encrypt channel secrets at rest.

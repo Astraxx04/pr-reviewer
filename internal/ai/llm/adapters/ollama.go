@@ -1,6 +1,6 @@
 package adapters
 
-import "pr-reviewer/internal/ai/llm"
+import "github.com/Astraxx04/pr-reviewer/internal/ai/llm"
 
 const defaultOllamaBase = "http://localhost:11434/v1"
 

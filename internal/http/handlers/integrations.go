@@ -6,9 +6,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/integration/jira"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/integration/jira"
 )
 
 // IntegrationHandler manages third-party integration configs (currently Jira).

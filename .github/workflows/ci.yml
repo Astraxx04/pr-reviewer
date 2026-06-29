@@ -69,7 +69,7 @@ jobs:
         run: |
           CGO_ENABLED=0 go build -o /dev/null ./cmd/server
           CGO_ENABLED=0 go build -o /dev/null ./cmd/migrate
-          CGO_ENABLED=0 go build -o /dev/null ./cmd/cli
+          CGO_ENABLED=0 go build -o /dev/null ./cmd/prrev
 
   build-web:
     name: Build Web

@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/oauth2"
 
-	"pr-reviewer/internal/telemetry"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/telemetry"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // Client is the interface for interacting with GitHub.

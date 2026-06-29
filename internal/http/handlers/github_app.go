@@ -8,9 +8,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	dbpkg "pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	gh "pr-reviewer/internal/github"
+	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 )
 
 // singletonConfigID pins the GitHub App config to a single row. There is only ever
@@ -28,10 +28,10 @@ func NewGithubAppHandler(db *gorm.DB, encryptionKey string) *GithubAppHandler {
 }
 
 type githubAppStatus struct {
-	Configured          bool  `json:"configured"`
-	AppID               int64 `json:"app_id,omitempty"`
-	HasWebhookSecret    bool  `json:"has_webhook_secret"`
-	HasGitHubToken      bool  `json:"has_github_token"`
+	Configured       bool  `json:"configured"`
+	AppID            int64 `json:"app_id,omitempty"`
+	HasWebhookSecret bool  `json:"has_webhook_secret"`
+	HasGitHubToken   bool  `json:"has_github_token"`
 }
 
 func (h *GithubAppHandler) Get(w http.ResponseWriter, r *http.Request) {

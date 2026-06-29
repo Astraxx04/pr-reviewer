@@ -11,8 +11,8 @@ import (
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // TeamSyncJobArgs triggers a sync of GitHub team membership into the team_members table.

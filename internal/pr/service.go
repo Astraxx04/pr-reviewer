@@ -6,9 +6,9 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/internal/telemetry"
-	"pr-reviewer/pkg/logger"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/telemetry"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // this defines the interface for PR operations.

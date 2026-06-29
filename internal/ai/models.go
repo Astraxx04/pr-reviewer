@@ -1,7 +1,7 @@
 package ai
 
 import (
-	"pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/github"
 )
 
 // ReviewResult represents the outcome of an AI review.

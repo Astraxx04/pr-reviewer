@@ -7,13 +7,13 @@ import (
 	"strings"
 	"sync"
 
-	"pr-reviewer/internal/ai/embeddings"
-	"pr-reviewer/internal/ai/mcp"
-	"pr-reviewer/internal/ai/rag"
-	"pr-reviewer/internal/config"
-	"pr-reviewer/internal/github"
-	"pr-reviewer/internal/telemetry"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/embeddings"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/mcp"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/rag"
+	"github.com/Astraxx04/pr-reviewer/internal/config"
+	"github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/telemetry"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 
 	"go.opentelemetry.io/otel/attribute"
 )

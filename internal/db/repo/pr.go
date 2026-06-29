@@ -3,9 +3,9 @@ package repo
 import (
 	"context"
 
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"pr-reviewer/internal/db/models"
 )
 
 type PRRepo struct {

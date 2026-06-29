@@ -17,12 +17,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	"pr-reviewer/internal/jobs"
-	"pr-reviewer/internal/metrics"
-	"pr-reviewer/internal/telemetry"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
+	"github.com/Astraxx04/pr-reviewer/internal/jobs"
+	"github.com/Astraxx04/pr-reviewer/internal/metrics"
+	"github.com/Astraxx04/pr-reviewer/internal/telemetry"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 type WebhookHandler struct {
@@ -120,8 +120,10 @@ func (h *WebhookHandler) handlePullRequest(r *http.Request, payload []byte, w ht
 			Draft bool `json:"draft"`
 			Base  struct {
 				Repo struct {
-					Owner struct{ Login string `json:"login"` } `json:"owner"`
-					Name  string                                `json:"name"`
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+					Name string `json:"name"`
 				} `json:"repo"`
 			} `json:"base"`
 		} `json:"pull_request"`
@@ -134,10 +136,10 @@ func (h *WebhookHandler) handlePullRequest(r *http.Request, payload []byte, w ht
 	h.log.Info("received webhook", "action", event.Action, "number", event.Number, "draft", event.PullRequest.Draft)
 
 	validActions := map[string]bool{
-		"opened":            true,
-		"reopened":          true,
-		"synchronize":       true,
-		"ready_for_review":  true,
+		"opened":           true,
+		"reopened":         true,
+		"synchronize":      true,
+		"ready_for_review": true,
 	}
 	if !validActions[event.Action] {
 		metrics.WebhookRequestsTotal.WithLabelValues("skipped").Inc()
@@ -223,7 +225,7 @@ func (h *WebhookHandler) handlePullRequest(r *http.Request, payload []byte, w ht
 }
 
 type ghInstallationPayload struct {
-	Action string `json:"action"`
+	Action       string `json:"action"`
 	Installation struct {
 		ID      int64 `json:"id"`
 		Account struct {
@@ -238,7 +240,7 @@ type ghInstallationPayload struct {
 
 type ghInstallationReposPayload struct {
 	Installation struct {
-		ID      int64  `json:"id"`
+		ID      int64 `json:"id"`
 		Account struct {
 			Login string `json:"login"`
 		} `json:"account"`
@@ -374,8 +376,10 @@ func (h *WebhookHandler) handlePRReviewComment(ctx context.Context, payload []by
 			Number int `json:"number"`
 			Base   struct {
 				Repo struct {
-					Owner struct{ Login string `json:"login"` } `json:"owner"`
-					Name  string                                `json:"name"`
+					Owner struct {
+						Login string `json:"login"`
+					} `json:"owner"`
+					Name string `json:"name"`
 				} `json:"repo"`
 			} `json:"base"`
 		} `json:"pull_request"`
@@ -436,8 +440,10 @@ func (h *WebhookHandler) handleIssueComment(ctx context.Context, payload []byte,
 			} `json:"user"`
 		} `json:"comment"`
 		Repository struct {
-			Owner struct{ Login string `json:"login"` } `json:"owner"`
-			Name  string                                `json:"name"`
+			Owner struct {
+				Login string `json:"login"`
+			} `json:"owner"`
+			Name string `json:"name"`
 		} `json:"repository"`
 	}
 	if err := json.Unmarshal(payload, &event); err != nil {

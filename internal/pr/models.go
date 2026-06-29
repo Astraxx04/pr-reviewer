@@ -1,7 +1,7 @@
 package pr
 
 import (
-	"pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/github"
 	"time"
 )
 

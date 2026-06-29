@@ -10,8 +10,8 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/datatypes"
 
-	"pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 func main() {

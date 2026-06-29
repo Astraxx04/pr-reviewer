@@ -1,6 +1,6 @@
 package adapters
 
-import "pr-reviewer/internal/ai/llm"
+import "github.com/Astraxx04/pr-reviewer/internal/ai/llm"
 
 // NewOpenAICompatible creates a Provider for any OpenAI-compatible endpoint
 // (Groq, Together AI, Mistral, LMStudio, vLLM, etc.).

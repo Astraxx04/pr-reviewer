@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
 type RetentionHandler struct{ db *gorm.DB }
@@ -18,7 +18,7 @@ type RetentionHandler struct{ db *gorm.DB }
 func NewRetentionHandler(db *gorm.DB) *RetentionHandler { return &RetentionHandler{db: db} }
 
 type RetentionSettings struct {
-	ReviewRetentionDays      int  `json:"review_retention_days"`       // 0 = keep forever
+	ReviewRetentionDays      int  `json:"review_retention_days"` // 0 = keep forever
 	PurgeEmbeddingsOnDisable bool `json:"purge_embeddings_on_disable"`
 }
 

@@ -1,4 +1,4 @@
-module pr-reviewer
+module github.com/Astraxx04/pr-reviewer
 
 go 1.25.6
 

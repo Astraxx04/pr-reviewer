@@ -11,9 +11,9 @@ import (
 	"github.com/riverqueue/river"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/notifications"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/notifications"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // EmailDigestJobArgs triggers digest emails for all email notification configs whose

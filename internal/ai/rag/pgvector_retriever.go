@@ -7,8 +7,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/ai/embeddings"
-	"pr-reviewer/internal/telemetry"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/embeddings"
+	"github.com/Astraxx04/pr-reviewer/internal/telemetry"
 
 	"go.opentelemetry.io/otel/attribute"
 )

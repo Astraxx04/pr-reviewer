@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // openaiEmbedder calls the OpenAI Embeddings API directly.

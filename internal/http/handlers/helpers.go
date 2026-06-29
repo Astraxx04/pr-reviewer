@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"pr-reviewer/internal/http/middleware"
+	"github.com/Astraxx04/pr-reviewer/internal/http/middleware"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

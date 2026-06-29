@@ -7,12 +7,12 @@ import (
 
 	"gorm.io/gorm"
 
-	dbpkg "pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/internal/db/repo"
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/internal/audit"
-	"pr-reviewer/internal/jobs"
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
+	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/internal/jobs"
 )
 
 type RepoHandler struct {

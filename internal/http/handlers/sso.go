@@ -20,9 +20,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	dbpkg "pr-reviewer/internal/db"
-	"pr-reviewer/internal/db/models"
-	"pr-reviewer/pkg/logger"
+	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 type SSOHandler struct {

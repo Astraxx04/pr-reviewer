@@ -6,8 +6,8 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	"pr-reviewer/internal/ai/mcp"
-	"pr-reviewer/internal/telemetry"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/mcp"
+	"github.com/Astraxx04/pr-reviewer/internal/telemetry"
 )
 
 // AgentOrchestrator manages multiple agents.

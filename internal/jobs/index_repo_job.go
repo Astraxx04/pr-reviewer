@@ -10,11 +10,11 @@ import (
 	"github.com/riverqueue/river"
 	"gorm.io/gorm"
 
-	"pr-reviewer/internal/ai/embeddings"
-	"pr-reviewer/internal/ai/rag"
-	"pr-reviewer/internal/db/models"
-	gh "pr-reviewer/internal/github"
-	"pr-reviewer/pkg/logger"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/embeddings"
+	"github.com/Astraxx04/pr-reviewer/internal/ai/rag"
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
+	gh "github.com/Astraxx04/pr-reviewer/internal/github"
+	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 // IndexRepoJobArgs is enqueued when a repo is enabled or on the weekly periodic schedule.

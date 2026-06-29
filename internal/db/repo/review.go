@@ -3,8 +3,8 @@ package repo
 import (
 	"context"
 
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"gorm.io/gorm"
-	"pr-reviewer/internal/db/models"
 )
 
 type ReviewRepo struct {

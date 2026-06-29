@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"gorm.io/gorm"
-	"pr-reviewer/internal/db/models"
 )
 
 type DeliveryRepo struct {
