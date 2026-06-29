@@ -30,7 +30,8 @@
         {
           "id": "prReviewer.prList",
           "name": "Pull Requests",
-          "contextualTitle": "PR Reviewer"
+          "contextualTitle": "PR Reviewer",
+          "icon": "assets/sidebar-icon.svg"
         }
       ]
     },
