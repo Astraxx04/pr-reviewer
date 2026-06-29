@@ -128,15 +128,15 @@ dockers:
     image_templates:
       - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:{{ .Version }}"
       - "ghcr.io/{{ tolower .Env.GITHUB_REPOSITORY_OWNER }}/pr-reviewer:latest"
-    dockerfile: Dockerfile
+    # Uses the prebuilt binary (see Dockerfile.release) — GoReleaser's build
+    # context has the compiled artifact, not the Go source.
+    dockerfile: Dockerfile.release
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title=pr-reviewer"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-    extra_files:
-      - web/
 
 release:
   github:
