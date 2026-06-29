@@ -1,54 +1,195 @@
 import * as vscode from "vscode";
 import { Client, ApiError, PRSummary, PRComment } from "./api";
-import { detectRepo, RepoRef } from "./git";
+import { detectRepo, getCurrentBranch, RepoRef } from "./git";
+import { StatusBarManager } from "./statusBar";
+import { PRTreeProvider, PRNode } from "./prTreeProvider";
+import { FindingHoverProvider } from "./hoverProvider";
+import { createDecorationTypes, applyGutterDecorations, clearDecorations, DecorationTypes } from "./decorations";
+import { openPRWebview } from "./webviewPanel";
 
-let diagnostics: vscode.DiagnosticCollection;
+let diagnosticCollection: vscode.DiagnosticCollection;
+let decorationTypes: DecorationTypes | undefined;
+
+// Shared state updated by every refresh
+let allComments: PRComment[] = [];
+let currentFolder: vscode.WorkspaceFolder | undefined;
+let currentRepo: RepoRef | undefined;
+let currentClient: Client | undefined;
+
+let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+interface Surfaces {
+  statusBar: StatusBarManager;
+  treeProvider: PRTreeProvider;
+  hoverProvider: FindingHoverProvider;
+}
 
 export function activate(context: vscode.ExtensionContext) {
-  diagnostics = vscode.languages.createDiagnosticCollection("pr-reviewer");
-  context.subscriptions.push(diagnostics);
+  diagnosticCollection = vscode.languages.createDiagnosticCollection("pr-reviewer");
+  decorationTypes = createDecorationTypes(context.extensionPath);
+
+  const statusBar = new StatusBarManager(context);
+  const treeProvider = new PRTreeProvider();
+  const hoverProvider = new FindingHoverProvider();
+  const surfaces: Surfaces = { statusBar, treeProvider, hoverProvider };
+
+  const treeView = vscode.window.createTreeView("prReviewer.prList", {
+    treeDataProvider: treeProvider,
+    showCollapseAll: true,
+  });
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("prReviewer.showFindings", () => withErrors(showFindings)),
-    vscode.commands.registerCommand("prReviewer.triggerReview", () => withErrors(triggerReview)),
+    diagnosticCollection,
+    treeView,
+    vscode.languages.registerHoverProvider({ scheme: "file" }, hoverProvider),
+
+    // Re-apply gutter decorations when switching files
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor && decorationTypes && currentFolder) {
+        applyGutterDecorations(editor, allComments, currentFolder, decorationTypes);
+      }
+    }),
+
+    // --- Commands ---
+
+    vscode.commands.registerCommand("prReviewer.showFindings", () =>
+      withErrors(async () => {
+        const ctx = await getContext();
+        const pr = await pickPR(ctx.client, ctx.repo);
+        if (!pr) return;
+        const detail = await ctx.client.getPR(ctx.repo.owner, ctx.repo.repo, pr.number);
+        const comments = detail.latest_comments ?? [];
+        applyAllSurfaces(ctx.folder, ctx.repo, ctx.client, comments, [pr], surfaces);
+        const n = comments.length;
+        vscode.window.showInformationMessage(
+          n === 0
+            ? `PR Reviewer: no findings on #${pr.number}.`
+            : `PR Reviewer: ${n} finding(s) on #${pr.number} (see Problems panel).`
+        );
+      })
+    ),
+
+    vscode.commands.registerCommand("prReviewer.triggerReview", (node?: unknown) =>
+      withErrors(async () => {
+        const ctx = await getContext();
+        let prNumber: number;
+        if (node instanceof PRNode) {
+          prNumber = node.pr.number;
+        } else {
+          const pr = await pickPR(ctx.client, ctx.repo);
+          if (!pr) return;
+          prNumber = pr.number;
+        }
+        await ctx.client.triggerReview(ctx.repo.owner, ctx.repo.repo, prNumber);
+        vscode.window.showInformationMessage(`PR Reviewer: review queued for #${prNumber}.`);
+      })
+    ),
+
     vscode.commands.registerCommand("prReviewer.clearFindings", () => {
-      diagnostics.clear();
+      diagnosticCollection.clear();
+      allComments = [];
+      treeProvider.clear();
+      hoverProvider.clear();
+      statusBar.update(undefined, 0);
+      if (decorationTypes) {
+        for (const editor of vscode.window.visibleTextEditors) {
+          clearDecorations(editor, decorationTypes);
+        }
+      }
       vscode.window.showInformationMessage("PR Reviewer: findings cleared.");
-    })
+    }),
+
+    vscode.commands.registerCommand("prReviewer.focusSidebar", () => {
+      vscode.commands.executeCommand("prReviewer.prList.focus");
+    }),
+
+    vscode.commands.registerCommand("prReviewer.openWebview", (pr: PRSummary) =>
+      withErrors(async () => {
+        const ctx = await getContext();
+        await openPRWebview(context, ctx.client, ctx.repo, pr);
+      })
+    ),
+
+    vscode.commands.registerCommand("prReviewer.refresh", () =>
+      withErrors(() => refreshAll(surfaces))
+    ),
+
+    { dispose: () => { if (pollTimer) clearInterval(pollTimer); } }
   );
+
+  // Start background refresh (silently — no error toasts on startup)
+  startPolling(surfaces);
 }
 
 export function deactivate() {
-  diagnostics?.dispose();
+  diagnosticCollection?.dispose();
+  if (pollTimer) clearInterval(pollTimer);
 }
 
-// --- commands ---
+// --- Background refresh ---
 
-async function showFindings() {
-  const { client, folder, repo } = await context();
-  const pr = await pickPR(client, repo);
-  if (!pr) return;
+function startPolling(surfaces: Surfaces): void {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => refreshAll(surfaces).catch(() => {}), 60_000);
+  refreshAll(surfaces).catch(() => {});
+}
 
-  const detail = await client.getPR(repo.owner, repo.repo, pr.number);
-  renderDiagnostics(folder, detail.latest_comments ?? []);
+async function refreshAll(surfaces: Surfaces): Promise<void> {
+  let ctx: Awaited<ReturnType<typeof getContext>>;
+  try {
+    ctx = await getContext();
+  } catch {
+    return; // not configured yet — stay silent
+  }
 
-  const n = (detail.latest_comments ?? []).length;
-  if (n === 0) {
-    vscode.window.showInformationMessage(`PR Reviewer: no findings on #${pr.number}.`);
-  } else {
-    vscode.window.showInformationMessage(`PR Reviewer: ${n} finding(s) on #${pr.number} (see Problems panel).`);
+  const { prs } = await ctx.client.listPRs(`${ctx.repo.owner}/${ctx.repo.repo}`);
+  if (!prs || prs.length === 0) {
+    surfaces.statusBar.update(undefined, 0);
+    surfaces.treeProvider.clear();
+    return;
+  }
+
+  const branch = await getCurrentBranch(ctx.folder.uri.fsPath);
+  const activePR = (branch ? prs.find((p) => p.head_branch === branch) : undefined) ?? prs[0];
+
+  const detail = await ctx.client.getPR(ctx.repo.owner, ctx.repo.repo, activePR.number);
+  const comments = detail.latest_comments ?? [];
+
+  applyAllSurfaces(ctx.folder, ctx.repo, ctx.client, comments, prs, surfaces, activePR);
+}
+
+// --- Surface orchestration ---
+
+function applyAllSurfaces(
+  folder: vscode.WorkspaceFolder,
+  repo: RepoRef,
+  client: Client,
+  comments: PRComment[],
+  prs: PRSummary[],
+  surfaces: Surfaces,
+  activePR?: PRSummary
+): void {
+  allComments = comments;
+  currentFolder = folder;
+  currentRepo = repo;
+  currentClient = client;
+
+  renderDiagnostics(folder, comments);
+
+  const findingsByPR = new Map<number, PRComment[]>();
+  if (activePR) findingsByPR.set(activePR.number, comments);
+  surfaces.treeProvider.update(prs, findingsByPR, folder);
+  surfaces.hoverProvider.update(comments, folder);
+  surfaces.statusBar.update(activePR, comments.length);
+
+  if (decorationTypes) {
+    for (const editor of vscode.window.visibleTextEditors) {
+      applyGutterDecorations(editor, comments, folder, decorationTypes);
+    }
   }
 }
 
-async function triggerReview() {
-  const { client, repo } = await context();
-  const pr = await pickPR(client, repo);
-  if (!pr) return;
-  await client.triggerReview(repo.owner, repo.repo, pr.number);
-  vscode.window.showInformationMessage(`PR Reviewer: review queued for #${pr.number}.`);
-}
-
-// --- helpers ---
+// --- Helpers ---
 
 interface Context {
   client: Client;
@@ -56,19 +197,17 @@ interface Context {
   repo: RepoRef;
 }
 
-async function context(): Promise<Context> {
+async function getContext(): Promise<Context> {
   const cfg = vscode.workspace.getConfiguration("prReviewer");
   const serverUrl = (cfg.get<string>("serverUrl") ?? "").trim();
   const apiToken = (cfg.get<string>("apiToken") ?? "").trim();
   if (!serverUrl || !apiToken) {
     throw new ApiError("Set prReviewer.serverUrl and prReviewer.apiToken in Settings first.");
   }
-
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
     throw new ApiError("Open a folder containing a git repository first.");
   }
-
   const repo = await detectRepo(folder.uri.fsPath);
   if (!repo) {
     throw new ApiError("Could not determine the GitHub repo from the git 'origin' remote.");
@@ -93,8 +232,8 @@ async function pickPR(client: Client, repo: RepoRef): Promise<PRSummary | undefi
   return picked?.pr;
 }
 
-function renderDiagnostics(folder: vscode.WorkspaceFolder, comments: PRComment[]) {
-  diagnostics.clear();
+function renderDiagnostics(folder: vscode.WorkspaceFolder, comments: PRComment[]): void {
+  diagnosticCollection.clear();
   const byFile = new Map<string, vscode.Diagnostic[]>();
   for (const c of comments) {
     if (!c.path) continue;
@@ -106,9 +245,8 @@ function renderDiagnostics(folder: vscode.WorkspaceFolder, comments: PRComment[]
     list.push(diag);
     byFile.set(c.path, list);
   }
-  for (const [path, diags] of byFile) {
-    const uri = vscode.Uri.joinPath(folder.uri, path);
-    diagnostics.set(uri, diags);
+  for (const [filePath, diags] of byFile) {
+    diagnosticCollection.set(vscode.Uri.joinPath(folder.uri, filePath), diags);
   }
 }
 
@@ -124,7 +262,7 @@ function severityFor(priority: string): vscode.DiagnosticSeverity {
   }
 }
 
-async function withErrors(fn: () => Promise<void>) {
+async function withErrors(fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
   } catch (e) {

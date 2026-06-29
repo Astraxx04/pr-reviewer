@@ -1,43 +1,119 @@
 {
-  "name": "pr-reviewer-vscode",
+  "name": "pr-reviewer",
   "displayName": "PR Reviewer",
-  "description": "View AI code-review findings for the current branch's PR and trigger reviews from VS Code.",
+  "description": "AI-powered PR reviews inside VS Code — inline findings, gutter icons, sidebar panel, and auto-refresh for your current branch.",
   "version": "0.1.0",
-  "publisher": "pr-reviewer",
+  "publisher": "astraxx",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Astraxx04/pr-reviewer.git"
+  },
   "private": true,
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "assets/logo.png",
   "categories": ["Linters", "SCM Providers", "Other"],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "prReviewer",
+          "title": "PR Reviewer",
+          "icon": "assets/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "prReviewer": [
+        {
+          "id": "prReviewer.prList",
+          "name": "Pull Requests",
+          "contextualTitle": "PR Reviewer"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "prReviewer.showFindings",
-        "title": "PR Reviewer: Show Findings for a PR"
+        "category": "PR Reviewer",
+        "title": "Show Findings for a PR",
+        "shortTitle": "Show Findings"
       },
       {
         "command": "prReviewer.triggerReview",
-        "title": "PR Reviewer: Trigger Review"
+        "category": "PR Reviewer",
+        "title": "Trigger Review",
+        "shortTitle": "Trigger Review",
+        "icon": "$(sync)"
       },
       {
         "command": "prReviewer.clearFindings",
-        "title": "PR Reviewer: Clear Findings"
+        "category": "PR Reviewer",
+        "title": "Clear Findings",
+        "shortTitle": "Clear",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "prReviewer.refresh",
+        "category": "PR Reviewer",
+        "title": "Refresh",
+        "shortTitle": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "prReviewer.openWebview",
+        "category": "PR Reviewer",
+        "title": "Open PR Summary",
+        "shortTitle": "Summary",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "prReviewer.focusSidebar",
+        "category": "PR Reviewer",
+        "title": "Focus Sidebar"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "prReviewer.refresh",
+          "when": "view == prReviewer.prList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "prReviewer.clearFindings",
+          "when": "view == prReviewer.prList",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "prReviewer.openWebview",
+          "when": "view == prReviewer.prList && viewItem == pr",
+          "group": "inline@1"
+        },
+        {
+          "command": "prReviewer.triggerReview",
+          "when": "view == prReviewer.prList && viewItem == pr",
+          "group": "inline@2"
+        }
+      ]
+    },
     "configuration": {
       "title": "PR Reviewer",
       "properties": {
         "prReviewer.serverUrl": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Base URL of your PR Reviewer server, e.g. `https://pr-reviewer.yourco.com`."
+          "markdownDescription": "Base URL of your self-hosted PR Reviewer server (no trailing slash), e.g. `https://pr-reviewer.yourco.com`. All API requests are sent here using your API token."
         },
         "prReviewer.apiToken": {
           "type": "string",
           "default": "",
-          "markdownDescription": "A PR Reviewer API token (starts with `prt_`). Generate one under Settings → API Tokens."
+          "markdownDescription": "Long-lived API token for the PR Reviewer server (starts with `prt_`). Generate one in the web UI under **Settings → API Tokens → Create**. Sent as a `Bearer` header on every request."
         }
       }
     }

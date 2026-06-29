@@ -8,6 +8,7 @@ export interface PRSummary {
   repo: string;
   pr_status: string;
   current_score: number;
+  head_branch?: string;
 }
 
 export interface PRComment {

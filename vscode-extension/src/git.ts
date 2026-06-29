@@ -11,6 +11,15 @@ export interface RepoRef {
 // detectRepo reads the `origin` remote of the git repository at cwd and parses the
 // GitHub owner/repo. Supports both SSH (git@github.com:owner/repo.git) and HTTPS
 // (https://github.com/owner/repo(.git)) remote URLs.
+export async function getCurrentBranch(cwd: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd });
+    return stdout.trim();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function detectRepo(cwd: string): Promise<RepoRef | undefined> {
   let url: string;
   try {
