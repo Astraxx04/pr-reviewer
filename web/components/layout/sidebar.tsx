@@ -66,7 +66,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         aria-label="Main navigation"
       >
         <div className="mb-1 flex items-center justify-between px-3">
-          <Link href="/dashboard" className="block w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm">
+          <Link href="/dashboard" className="block pt-2 pb-4 w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm">
             <Image src="/logo-horizontal.png" alt="PR Reviewer" width={1983} height={793} style={{ width: '100%', height: 'auto' }} priority />
           </Link>
           {isMobileControlled && (

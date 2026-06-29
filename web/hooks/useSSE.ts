@@ -8,6 +8,11 @@ export interface SSEEvent {
   data: unknown;
 }
 
+const isDev = process.env.NODE_ENV === "development";
+const SSE_BASE = isDev ? "http://localhost:8001" : API_URL;
+const INITIAL_RETRY_MS = 1_000;
+const MAX_RETRY_MS = 30_000;
+
 export function useSSE(token: string | null, onEvent: (event: SSEEvent) => void) {
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
@@ -15,22 +20,47 @@ export function useSSE(token: string | null, onEvent: (event: SSEEvent) => void)
   useEffect(() => {
     if (!token) return;
 
-    const url = `${API_URL}/api/events?token=${encodeURIComponent(token)}&ngrok-skip-browser-warning=true`;
-    const es = new EventSource(url);
+    let es: EventSource | null = null;
+    let retryMs = INITIAL_RETRY_MS;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
 
-    es.onmessage = (e: MessageEvent) => {
-      try {
-        const event = JSON.parse(e.data as string) as SSEEvent;
-        onEventRef.current(event);
-      } catch {
-        // ignore malformed events
-      }
+    function connect() {
+      const params = new URLSearchParams({ token: token! });
+
+      es = new EventSource(`${SSE_BASE}/api/events?${params}`);
+
+      es.onopen = () => {
+        retryMs = INITIAL_RETRY_MS;
+      };
+
+      es.onmessage = (e: MessageEvent) => {
+        retryMs = INITIAL_RETRY_MS;
+        try {
+          const event = JSON.parse(e.data as string) as SSEEvent;
+          onEventRef.current(event);
+        } catch {
+          // ignore malformed events
+        }
+      };
+
+      es.onerror = () => {
+        es?.close();
+        es = null;
+        if (stopped) return;
+        retryTimer = setTimeout(() => {
+          if (!stopped) connect();
+        }, retryMs);
+        retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
+      };
+    }
+
+    connect();
+
+    return () => {
+      stopped = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      es?.close();
     };
-
-    es.onerror = () => {
-      // EventSource auto-reconnects on error; nothing to do here
-    };
-
-    return () => es.close();
   }, [token]);
 }

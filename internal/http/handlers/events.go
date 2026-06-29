@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
@@ -63,6 +64,11 @@ func (h *EventsHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, ": connected\n\n")
 	flusher.Flush()
 
+	// Periodic heartbeat keeps the connection alive through proxies and
+	// tunnels (e.g. ngrok) that close idle long-lived connections.
+	ticker := time.NewTicker(20 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case data, ok := <-ch:
@@ -70,6 +76,9 @@ func (h *EventsHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case <-ticker.C:
+			_, _ = fmt.Fprint(w, ": heartbeat\n\n")
 			flusher.Flush()
 		case <-r.Context().Done():
 			return
