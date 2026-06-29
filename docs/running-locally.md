@@ -143,10 +143,14 @@ NEXT_PUBLIC_API_URL=http://localhost:8001 npm run dev
 
 ## 5. One-command dev mode (recommended)
 
-From the project root, `make dev` starts both services concurrently and kills them together on Ctrl-C:
+From the project root, `make up` starts the full Docker Compose dev stack
+(Postgres + backend with live-reload + frontend + ngrok) detached:
 
 ```bash
-make dev
+make up        # start (detached)
+make build     # first run / after dependency or Dockerfile.dev changes
+make logs      # follow logs (make logs-app for just the server)
+make down      # stop everything
 ```
 
 ---
@@ -216,15 +220,18 @@ docker compose down -v       # also delete the postgres volume
 ## 9. Useful make targets
 
 ```
-make dev              start backend + frontend in watch mode (Ctrl-C to stop both)
-make build            compile all Go binaries and the Next.js app
+make up               start the full dev stack (postgres + backend + frontend + ngrok), detached
+make build            clear caches, rebuild images, then start
+make down             stop the dev stack (ARGS=-v also drops the postgres volume)
+make logs             tail logs from all services (logs-app / logs-web / logs-postgres / logs-ngrok)
+make shell            open a shell in a container (defaults to app; override with ser=web)
 make test             run Go tests (race detector) + TypeScript type-check
-make lint             golangci-lint + ESLint
-make fmt              gofmt + prettier
-make migrate          run DB migrations only (go run ./cmd/migrate up)
+make format           format Go + frontend source
+make lint             golangci-lint (same as CI)
+make migrate          apply pending migrations (also migrate-down / migrate-status / migrate-new)
 make seed             seed the database with sample data
-make docker           build the Docker image
-make up / make down   docker compose up/down
+make hooks            install the git pre-commit hook
+make help             print all targets
 ```
 
 ---

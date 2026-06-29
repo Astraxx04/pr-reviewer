@@ -142,11 +142,11 @@ There are two migration sets, both applied together:
 | File | Started by | Purpose | Migrate service |
 |---|---|---|---|
 | `docker-compose.yml` | `docker compose up -d --build` | Production-like (built binary) | ✅ |
-| `docker-compose.dev.yml` | `make dev` / `make dev-build` | Hot-reload dev (`air`) + `ngrok` | ✅ |
+| `docker-compose.dev.yml` | `make up` / `make build` | Hot-reload dev (`air`) + `ngrok` | ✅ |
 
 ### Skipping migrations
 
-Set `SKIP_MIGRATIONS=true` (in `.env` or inline, e.g. `SKIP_MIGRATIONS=true make dev`)
+Set `SKIP_MIGRATIONS=true` (in `.env` or inline, e.g. `SKIP_MIGRATIONS=true make up`)
 to make the `migrate` service a no-op that still exits 0 — `app` then starts
 without re-applying migrations. The flag lives in the binary (honored inside the
 `MIGRATE_ONLY` block), so it behaves identically for dev and prod. Note: if the

@@ -1,7 +1,10 @@
-# Trying the CLI (`prrev`)
+# The `prrev` CLI — usage & development
 
-A hands-on, step-by-step guide to building the CLI, signing in, and running your
-first commands against a local server.
+A hands-on guide to **using** the `prrev` CLI (install → sign in → run commands)
+and to **developing** it (source layout, build/test, adding commands).
+
+- **Just want to use it?** Start at [§1 Install](#1-install-the-cli-prrev).
+- **Want to hack on it?** Jump to [Developing the CLI](#developing-the-cli).
 
 > **The CLI is a thin client over the HTTP API.** It does nothing on its own — it
 > needs a running backend to talk to. So the flow is: start the backend → build
@@ -69,46 +72,43 @@ prrev --version
 
 ---
 
-## 2. Start the backend
+## 2. Start the backend (Docker Compose dev stack)
 
-The CLI talks to the server defined in `.env` (`SERVER_PORT=8001` in this repo).
+The dev stack (`docker-compose.dev.yml`, driven by the `Makefile`) runs everything
+the CLI needs in one command: **Postgres**, the **API server** (`:8001`), the **web
+dashboard** (`:3000`), and an **ngrok tunnel** for the public `SERVER_URL`.
+Database migrations run automatically (the `migrate` service).
 
-**a) Start Postgres** (skip if you already have one):
-
-```bash
-docker run -d \
-  --name pr-reviewer-postgres \
-  -e POSTGRES_USER=pr_reviewer \
-  -e POSTGRES_PASSWORD=pr_reviewer \
-  -e POSTGRES_DB=pr_reviewer \
-  -p 5432:5432 \
-  pgvector/pgvector:pg16-alpine
-```
-
-**b) Make sure `.env` has the required secrets** (see `docs/running-locally.md`
-for the full list). Minimum for the CLI to work: `DATABASE_URL`, `JWT_SECRET`,
+**a) Fill in `.env`** (see [`docs/running-locally.md`](running-locally.md) for the
+full list). Required for the CLI flow: `DATABASE_URL`, `JWT_SECRET`,
 `ENCRYPTION_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVER_PORT`,
-`SERVER_URL`.
+`SERVER_URL`. Note `SERVER_URL` is your **ngrok URL** (the tunnel forwards to the
+server) — you'll pass that same URL to `prrev auth login` in the next step.
 
-**c) Run the server** (it auto-migrates the schema on startup):
+**b) Bring up the stack:**
 
 ```bash
-go run ./cmd/server
+make up            # docker compose -f docker-compose.dev.yml up -d
+# first run, or after changing deps/Dockerfile.dev:
+make build         # rebuild images, then start
 ```
 
-**d) (Recommended) Seed demo data** so `reviews list`, `prs list`, etc. actually
-return something:
+**c) (Recommended) Seed demo data** so `reviews list`, `prs list`, etc. return
+something (runs `go run ./cmd/seed` inside the app container):
 
 ```bash
 make seed
 ```
 
-**e) Confirm it's up:**
+**d) Confirm it's up:**
 
 ```bash
 curl http://localhost:8001/health     # -> ok
 curl http://localhost:8001/healthz    # -> {"status":"ok","db":"ok",...}
 ```
+
+Handy: `make logs` (all services), `make logs-app` (just the server), `make down`
+(stop everything). Run `make help` for the full list.
 
 ---
 
@@ -297,6 +297,101 @@ prrev prs re-review --help
 | `server returned 403` | Your user lacks the role for that action (e.g. `tokens` is admin-only). |
 | Connection refused | Backend not running, or wrong port — it's **8001**, not 8080. |
 | Empty lists everywhere | No data yet — run `make seed`, or connect a real repo + open a PR. |
+
+---
+
+## Developing the CLI
+
+The CLI lives entirely under [`cmd/prrev/`](../cmd/prrev). It's a [Cobra](https://github.com/spf13/cobra)
+app that's a **thin client over the HTTP API** — every command just calls an
+endpoint and renders the result. There is no business logic in the CLI.
+
+### Source layout
+
+| File | Responsibility |
+|------|----------------|
+| `main.go` | Root command, global flags (`--server`/`--json`/`--timeout`/`--config`), version, builds the shared `apiClient` in `PersistentPreRunE` |
+| `client.go` | Thin HTTP client (`get`/`post`/`patch`/`delete`), attaches the bearer token, maps `401`/expiry to a friendly "session expired" error |
+| `config.go` | Load/save/resolve config at `~/.config/pr-reviewer/config.json` (`--server` flag > file > default) |
+| `auth.go` | `login` (browser OAuth via a localhost loopback), `whoami`, `logout` |
+| `repos.go`, `prs.go`, `reviews.go`, `providers.go`, `dashboard.go`, `tokens.go` | One file per command group |
+| `output.go` | Table + JSON rendering helpers (`newTable`, `printJSON`) |
+| `util.go` | Shared helpers (parse IDs / `owner/repo#N` refs, time formatting) |
+| `cli_test.go` | Unit tests |
+
+### Build, run, test
+
+The `prrev` binary runs on **your host** (it's a client), so build and run it
+directly — you don't need it inside a container:
+
+```bash
+go build -o bin/prrev ./cmd/prrev      # build the CLI
+go run ./cmd/prrev <args>              # run without building
+go test ./cmd/prrev/                   # CLI unit tests
+```
+
+Repo-wide quality gates run **inside the dev container** via the Makefile (they
+operate on the whole Go module, not just the CLI):
+
+```bash
+make test          # go test -race ./...  + web tsc, inside the app container
+make lint          # golangci-lint run    (config: .golangci.yml)
+make fmt           # gofmt + prettier
+make hooks         # install the pre-commit hook (lint/vet/fmt before each commit)
+```
+
+### How auth works (for context)
+
+`prrev auth login` opens a localhost listener, sends you to
+`<SERVER>/auth/github?cli_redirect=http://127.0.0.1:<port>/callback`, and the
+server returns the token to that loopback **after you approve the consent screen**.
+The server only ever redirects tokens to a `localhost` address, and CLI tokens
+last 7 days. The token is stored in the config file — there's no token/env login.
+
+### Adding a new command
+
+Follow the existing pattern — a `newXxxCmd()` returning a `*cobra.Command`, wired
+into `newRootCmd()`'s `AddCommand(...)` in `main.go`:
+
+```go
+func newThingsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "things",
+		Short: "List things",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			data, err := apiClient.get(cmd.Context(), "/api/things", nil)
+			if err != nil {
+				return err
+			}
+			if jsonOut { // honor the global --json flag
+				return printJSON(data)
+			}
+			var things []Thing
+			if err := json.Unmarshal(data, &things); err != nil {
+				return err
+			}
+			t := newTable("ID", "NAME")
+			for _, x := range things {
+				t.row(fmt.Sprint(x.ID), x.Name)
+			}
+			t.flush()
+			return nil
+		},
+	}
+	return cmd
+}
+```
+
+Then register it: `root.AddCommand(newThingsCmd())`. Conventions to keep:
+`apiClient` is shared (don't build your own), always honor `--json` via `jsonOut`,
+return errors (don't `os.Exit`), and use `output.go` helpers for rendering.
+
+### Releasing
+
+The CLI is released on its own via GoReleaser (`.goreleaser.yml`) on any `v*`
+tag — it ships **only** the `prrev` binary (Homebrew cask, `go install`, and the
+`install.sh` script). See the project README's CLI section for the version flow.
 
 ---
 

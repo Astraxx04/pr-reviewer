@@ -77,7 +77,8 @@ findings → post review + commit status to GitHub → persist → notify.**
 | `deploy/helm` | Helm chart for Kubernetes |
 
 See [`docs/`](docs/) for detailed documentation — start with
-[`docs/tech_doc.md`](docs/tech_doc.md) and [`docs/running-locally.md`](docs/running-locally.md).
+[`docs/tech_doc.md`](docs/tech_doc.md), [`docs/running-locally.md`](docs/running-locally.md),
+and [`docs/trying-the-cli.md`](docs/trying-the-cli.md) (CLI usage & development).
 
 ---
 
@@ -100,7 +101,8 @@ The fastest way to run the full stack (Postgres + backend live-reload + frontend
 git clone <repository-url>
 cd pr-reviewer
 cp .env.example .env   # then fill in the values (see below)
-make dev               # starts postgres + backend + frontend
+make up                # starts postgres + backend + frontend + ngrok (detached)
+# first run / after dep changes: make build   |   stop: make down   |   all targets: make help
 ```
 
 `make help` lists all available targets.
@@ -173,6 +175,10 @@ Then in your GitHub repo, go to **Settings → Webhooks → Add webhook**:
 **signs in through your browser** (GitHub OAuth) and stores the resulting token in
 `~/.config/pr-reviewer/config.json` — there is no token-paste or env-var login.
 
+📖 **[Getting started & development guide → `docs/trying-the-cli.md`](docs/trying-the-cli.md)** —
+install, sign in, run your first commands, and how to develop the CLI (source layout,
+build/test, adding commands).
+
 ```bash
 # Homebrew (macOS):
 brew install Astraxx04/tap/prrev
@@ -191,9 +197,8 @@ prrev auth login --server https://your-server
 prrev whoami
 ```
 
-See [`docs/trying-the-cli.md`](docs/trying-the-cli.md) for the full walkthrough. For
-**CI/automation** (no browser), mint an API token with `prrev tokens create` and send it as
-an `Authorization: Bearer` header to the API directly.
+For **CI/automation** (no browser), mint an API token with `prrev tokens create` and send it
+as an `Authorization: Bearer` header to the API directly.
 
 ---
 
