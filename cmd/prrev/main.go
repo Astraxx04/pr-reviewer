@@ -11,14 +11,28 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 )
 
-// version is overridden at build time via -ldflags "-X main.version=...".
+// version is overridden at build time via -ldflags "-X main.version=..." (goreleaser).
 var version = "dev"
+
+// resolveVersion reports the CLI version. goreleaser sets it via ldflag; for
+// `go install module@vX.Y.Z` it falls back to the module version recorded in the
+// binary's build info. Local builds (`go build`/`go run`) report "dev".
+func resolveVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return version
+}
 
 // Global flags (persistent across all subcommands).
 var (
@@ -35,7 +49,7 @@ func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "prrev",
 		Short:         "CLI for the PR Reviewer service",
-		Version:       version,
+		Version:       resolveVersion(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
