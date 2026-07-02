@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToken } from "@/hooks/useToken";
 import { getRetentionSettings, putRetentionSettings, eraseUserData } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { toast } from "sonner";
 
 export default function RetentionPage() {
   const { token } = useToken();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [retentionDays, setRetentionDays] = useState(0);
@@ -82,26 +84,27 @@ export default function RetentionPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-8 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold">Data Retention</h1>
-        <p className="text-muted-foreground text-sm mt-1">
+        <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+        <h1 className="text-3xl font-bold">Data Retention</h1>
+        <p className="text-base text-muted-foreground mt-1">
           Configure how long review data is kept and manage GDPR erasure requests.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Review retention</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg">Review retention</CardTitle>
+          <CardDescription className="text-base">
             Automatically delete reviews older than the configured number of days.
             Set to 0 to keep reviews forever.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="retention-days">Retention period (days)</Label>
-            <div className="flex items-center gap-3 mt-1">
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="retention-days">Retention period (days)</Label>
+            <div className="flex items-center gap-3">
               <Input
                 id="retention-days"
                 type="number"
@@ -116,17 +119,21 @@ export default function RetentionPage() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="text-base font-medium">Purge code embeddings on disable</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Remove vector embeddings when a repo is disabled</p>
+            </div>
             <Switch
               id="purge-embeddings"
               checked={purgeEmbeddings}
               onCheckedChange={setPurgeEmbeddings}
+              className="cursor-pointer"
             />
-            <Label htmlFor="purge-embeddings">
-              Purge code embeddings when a repo is disabled
-            </Label>
           </div>
-          <Button onClick={handleSave} disabled={saving}>
+
+          <Button size="lg" onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save settings"}
           </Button>
         </CardContent>
@@ -134,23 +141,24 @@ export default function RetentionPage() {
 
       <Card className="border-destructive/40">
         <CardHeader>
-          <CardTitle>GDPR — Right to erasure</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg">GDPR — Right to erasure</CardTitle>
+          <CardDescription className="text-base">
             Permanently delete all data associated with a GitHub user login. This action cannot be undone.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="erase-login">GitHub login</Label>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="erase-login">GitHub login <span className="text-muted-foreground font-normal">(username)</span></Label>
             <Input
               id="erase-login"
-              placeholder="github-username"
+              placeholder="e.g. octocat"
               value={eraseLogin}
               onChange={(e) => setEraseLogin(e.target.value)}
-              className="mt-1 max-w-xs"
+              className="max-w-xs"
             />
           </div>
           <Button
+            size="lg"
             variant="destructive"
             disabled={!eraseLogin.trim() || erasing}
             onClick={() => setEraseConfirmOpen(true)}
@@ -161,21 +169,17 @@ export default function RetentionPage() {
       </Card>
 
       <Dialog open={eraseConfirmOpen} onOpenChange={setEraseConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Erase all data for &ldquo;{eraseLogin}&rdquo;?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl">Erase all data for &ldquo;{eraseLogin}&rdquo;?</DialogTitle>
+            <DialogDescription className="text-base">
               This will permanently delete the user account, anonymise audit log entries, and revoke
               all API tokens for this user. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEraseConfirmOpen(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={handleErase}
-              disabled={erasing}
-            >
+            <Button size="lg" variant="ghost" onClick={() => setEraseConfirmOpen(false)}>Cancel</Button>
+            <Button size="lg" variant="destructive" onClick={handleErase} disabled={erasing}>
               {erasing ? "Erasing…" : "Erase"}
             </Button>
           </DialogFooter>

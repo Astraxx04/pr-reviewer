@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useToken } from "@/hooks/useToken";
 import {
   LayoutDashboard, GitPullRequest, Database, Users, BarChart2, Settings,
-  LogOut, GitMerge, Moon, Sun, X,
+  LogOut, GitMerge, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -33,9 +31,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { logout, isAdmin } = useToken();
   const visibleNav = nav.filter((item) => !item.adminOnly || isAdmin);
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   const isMobileControlled = open !== undefined;
 
@@ -52,7 +47,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
       <aside
         className={cn(
-          "flex h-screen w-56 flex-col border-r bg-card px-3 py-4",
+          "flex h-screen w-64 flex-col border-r bg-card px-3 py-4",
           // Desktop: always visible
           "md:relative md:translate-x-0 md:flex",
           // Mobile: slide in/out
@@ -73,11 +68,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden h-7 w-7"
+              className="md:hidden h-8 w-8"
               onClick={onClose}
               aria-label="Close navigation"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Button>
           )}
         </div>
@@ -88,16 +83,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-md px-3 py-2.5 text-base font-medium transition-colors",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                pathname === href
+                pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
-              aria-current={pathname === href ? "page" : undefined}
+              aria-current={pathname === href || (href !== "/dashboard" && pathname.startsWith(href)) ? "page" : undefined}
               onClick={onClose}
             >
-              <Icon className="h-4 w-4" aria-hidden="true" />
+              <Icon className="h-5 w-5" aria-hidden="true" />
               {label}
             </Link>
           ))}
@@ -122,11 +117,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           */}
           <Button
             variant="ghost"
-            className="flex-1 justify-start gap-3 text-muted-foreground"
+            className="flex-1 justify-start gap-3 text-lg text-muted-foreground" 
             onClick={logout}
             aria-label="Sign out"
           >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
+            <LogOut className="h-5 w-5" aria-hidden="true" />
             Sign out
           </Button>
         </div>

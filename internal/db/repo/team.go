@@ -8,12 +8,20 @@ import (
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
-type TeamMemberRepo struct{ db *gorm.DB }
-
-func NewTeamMemberRepo(db *gorm.DB) *TeamMemberRepo { return &TeamMemberRepo{db: db} }
-
-func (r *TeamMemberRepo) List(ctx context.Context, installationID uint) ([]models.TeamMember, error) {
-	var members []models.TeamMember
-	err := r.db.WithContext(ctx).Where("installation_id = ?", installationID).Find(&members).Error
-	return members, err
+// ListTeamLogins returns the GitHub logins of all active admin and reviewer users.
+// Used by the assignment evaluator when no explicit member list is configured on a rule.
+func ListTeamLogins(ctx context.Context, db *gorm.DB) ([]string, error) {
+	var users []models.User
+	err := db.WithContext(ctx).
+		Where("role IN ? AND status = ?", []string{"admin", "reviewer"}, "active").
+		Select("login").
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	logins := make([]string, 0, len(users))
+	for _, u := range users {
+		logins = append(logins, u.Login)
+	}
+	return logins, nil
 }

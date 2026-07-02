@@ -43,6 +43,7 @@ type RouterConfig struct {
 	RetentionHandler       *handlers.RetentionHandler
 	SSOHandler             *handlers.SSOHandler
 	APITokenHandler        *handlers.APITokenHandler
+	InviteHandler          *handlers.InviteHandler
 	IntegrationHandler     *handlers.IntegrationHandler
 	SlackAppHandler        *handlers.SlackAppHandler
 	RateLimiter            *middleware.RateLimiter
@@ -97,6 +98,12 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		mux.HandleFunc("POST /api/setup/reset", cfg.SetupHandler.Reset)
 	}
 
+	// Public invite token validation — must be registered on the outer mux before
+	// the /api/ catch-all so it takes precedence without requiring auth.
+	if cfg.InviteHandler != nil {
+		mux.HandleFunc("GET /api/invites/validate", cfg.InviteHandler.Validate)
+	}
+
 	// Protected API routes — wrap with JWT auth + session check.
 	api := http.NewServeMux()
 
@@ -118,6 +125,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		adminFunc("PATCH /api/users/{id}/role", cfg.UserHandler.UpdateRole)
 		adminFunc("PATCH /api/users/{id}/approve", cfg.UserHandler.Approve)
 		adminFunc("PATCH /api/users/{id}/reject", cfg.UserHandler.Reject)
+		adminFunc("DELETE /api/users/{id}", cfg.UserHandler.Remove)
 	}
 	if cfg.SessionHandler != nil {
 		api.HandleFunc("GET /api/sessions", cfg.SessionHandler.List)
@@ -142,12 +150,13 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	}
 	if cfg.TeamHandler != nil {
 		api.HandleFunc("GET /api/team", cfg.TeamHandler.List)
-		adminFunc("POST /api/team/members", cfg.TeamHandler.AddMember)
-		adminFunc("PATCH /api/team/members/{id}", cfg.TeamHandler.UpdateMember)
-		adminFunc("DELETE /api/team/members/{id}", cfg.TeamHandler.RemoveMember)
-		adminFunc("GET /api/settings/team-sync", cfg.TeamHandler.GetSyncConfig)
-		adminFunc("PUT /api/settings/team-sync", cfg.TeamHandler.PutSyncConfig)
-		adminFunc("POST /api/team/sync/trigger", cfg.TeamHandler.TriggerSync)
+	}
+	if cfg.InviteHandler != nil {
+		adminFunc("POST /api/invites", cfg.InviteHandler.Create)
+		adminFunc("POST /api/invites/bulk", cfg.InviteHandler.Bulk)
+		adminFunc("GET /api/invites", cfg.InviteHandler.List)
+		adminFunc("DELETE /api/invites/{id}", cfg.InviteHandler.Delete)
+		adminFunc("POST /api/invites/{id}/resend", cfg.InviteHandler.Resend)
 	}
 	if cfg.AssignHandler != nil {
 		api.HandleFunc("GET /api/repos/{repo_id}/assignments/rules", cfg.AssignHandler.ListRules)
@@ -222,9 +231,12 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		adminFunc("DELETE /api/settings/sso", cfg.SSOHandler.DeleteConfig)
 	}
 	if cfg.APITokenHandler != nil {
-		adminFunc("GET /api/tokens", cfg.APITokenHandler.List)
-		adminFunc("POST /api/tokens", cfg.APITokenHandler.Create)
-		adminFunc("DELETE /api/tokens/{id}", cfg.APITokenHandler.Revoke)
+		// Token routes are accessible to all authenticated roles — every user can
+		// manage their own tokens. The handlers enforce WHERE user_id = ? so users
+		// can only see and revoke their own tokens.
+		api.HandleFunc("GET /api/tokens", cfg.APITokenHandler.List)
+		api.HandleFunc("POST /api/tokens", cfg.APITokenHandler.Create)
+		api.HandleFunc("DELETE /api/tokens/{id}", cfg.APITokenHandler.Revoke)
 	}
 	if cfg.IntegrationHandler != nil {
 		adminFunc("GET /api/settings/integrations/jira", cfg.IntegrationHandler.GetJira)

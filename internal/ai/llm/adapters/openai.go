@@ -66,11 +66,11 @@ func (a *openaiAdapter) Complete(ctx context.Context, req llm.CompletionRequest)
 
 	start := time.Now()
 	resp, err := a.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model:     model,
-		Messages:  messages,
-		MaxTokens: openai.Int(maxTokens),
+		Model:               model,
+		Messages:            messages,
+		MaxCompletionTokens: openai.Int(maxTokens),
 	})
-	logger.ExternalCall(ctx, "openai", "Chat.Completions.New", start, err, "model", model, "max_tokens", maxTokens)
+	logger.ExternalCall(ctx, "openai", "Chat.Completions.New", start, err, "model", model, "max_completion_tokens", maxTokens)
 	if err != nil {
 		return nil, fmt.Errorf("openai: %w", err)
 	}

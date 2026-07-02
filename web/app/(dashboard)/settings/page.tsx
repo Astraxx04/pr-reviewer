@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Cpu, GitBranch, Bell, Webhook, ClipboardList, KeyRound, Database, ShieldCheck, Puzzle, MessageSquare } from "lucide-react";
+import { Cpu, GitBranch, Bell, Webhook, ClipboardList, KeyRound, Database, Puzzle, MessageSquare } from "lucide-react";
 
 const sections = [
   {
@@ -53,13 +53,7 @@ const sections = [
     icon: Database,
     label: "Configure",
   },
-  {
-    title: "Single Sign-On",
-    description: "Configure OIDC SSO for Okta, Azure AD, Google Workspace, or any OIDC IdP.",
-    href: "/settings/sso",
-    icon: ShieldCheck,
-    label: "Configure SSO",
-  },
+
   {
     title: "Jira",
     description: "Inject Jira ticket context into reviews when PRs reference ticket keys.",
@@ -78,21 +72,21 @@ const sections = [
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
-      <div className="grid gap-4 sm:grid-cols-2">
+    <div className="space-y-8">
+      <h1 className="text-3xl font-bold">Settings</h1>
+      <div className="grid gap-5 sm:grid-cols-2">
         {sections.map(({ title, description, href, icon: Icon, label }) => (
           <Card key={href}>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Icon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                 {title}
               </CardTitle>
-              <CardDescription>{description}</CardDescription>
+              <CardDescription className="text-sm">{description}</CardDescription>
             </CardHeader>
             <CardContent>
               <Link href={href}>
-                <Button variant="outline" size="sm">{label}</Button>
+                <Button variant="outline">{label}</Button>
               </Link>
             </CardContent>
           </Card>

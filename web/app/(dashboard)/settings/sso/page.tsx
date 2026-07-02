@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToken } from "@/hooks/useToken";
 import { getSSOConfig, putSSOConfig, deleteSSOConfig, type SSOConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -22,13 +23,35 @@ import {
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
 
-const DEFAULT_ROLE_MAPPING = JSON.stringify({ admin: "admin", developer: "reviewer" }, null, 2);
+const DEFAULT_ROLE_MAPPING = JSON.stringify({ owner: ["owners"], admin: ["admins"], reviewer: ["*"] }, null, 2);
+
+type FormSnapshot = {
+  issuer: string;
+  clientId: string;
+  redirectUrl: string;
+  roleMappingJson: string;
+  enforced: boolean;
+  enabled: boolean;
+};
+
+function makeSnapshot(cfg: SSOConfig): FormSnapshot {
+  return {
+    issuer: cfg.issuer ?? "",
+    clientId: cfg.client_id ?? "",
+    redirectUrl: cfg.redirect_url ?? "",
+    roleMappingJson: JSON.stringify(cfg.role_mapping ?? {}, null, 2),
+    enforced: cfg.enforced ?? false,
+    enabled: cfg.enabled ?? true,
+  };
+}
 
 export default function SSOPage() {
   const { token } = useToken();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [existing, setExisting] = useState<SSOConfig | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState<FormSnapshot | null>(null);
   const [issuer, setIssuer] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -40,18 +63,31 @@ export default function SSOPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const isDirty =
+    clientSecret !== "" ||
+    issuer !== (savedSnapshot?.issuer ?? "") ||
+    clientId !== (savedSnapshot?.clientId ?? "") ||
+    redirectUrl !== (savedSnapshot?.redirectUrl ?? "") ||
+    roleMappingJson !== (savedSnapshot?.roleMappingJson ?? DEFAULT_ROLE_MAPPING) ||
+    enforced !== (savedSnapshot?.enforced ?? false) ||
+    enabled !== (savedSnapshot?.enabled ?? true);
+
+  function applyConfig(cfg: SSOConfig) {
+    const snap = makeSnapshot(cfg);
+    setExisting(cfg);
+    setSavedSnapshot(snap);
+    setIssuer(snap.issuer);
+    setClientId(snap.clientId);
+    setRedirectUrl(snap.redirectUrl);
+    setRoleMappingJson(snap.roleMappingJson);
+    setEnforced(snap.enforced);
+    setEnabled(snap.enabled);
+  }
+
   useEffect(() => {
     if (!token) return;
     getSSOConfig(token)
-      .then((cfg) => {
-        setExisting(cfg);
-        setIssuer(cfg.Issuer ?? "");
-        setClientId(cfg.ClientID ?? "");
-        setRedirectUrl(cfg.RedirectURL ?? "");
-        setRoleMappingJson(JSON.stringify(cfg.RoleMapping ?? {}, null, 2));
-        setEnforced(cfg.Enforced ?? false);
-        setEnabled(cfg.Enabled ?? true);
-      })
+      .then(applyConfig)
       .catch(() => {
         // 404 means not configured yet — that's fine
       })
@@ -85,9 +121,8 @@ export default function SSOPage() {
         enabled,
       });
       toast.success("SSO configuration saved");
-      // Refresh to get ID etc.
       const updated = await getSSOConfig(token);
-      setExisting(updated);
+      applyConfig(updated);
       setClientSecret("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed");
@@ -102,6 +137,7 @@ export default function SSOPage() {
     try {
       await deleteSSOConfig(token);
       setExisting(null);
+      setSavedSnapshot(null);
       setIssuer(""); setClientId(""); setClientSecret("");
       setRedirectUrl(""); setRoleMappingJson(DEFAULT_ROLE_MAPPING);
       setEnforced(false); setEnabled(true);
@@ -124,33 +160,34 @@ export default function SSOPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 max-w-2xl">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Single Sign-On</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+          <h1 className="text-3xl font-bold">Single Sign-On</h1>
+          <p className="text-base text-muted-foreground mt-1">
             Configure OIDC SSO for Okta, Azure AD, Google Workspace, or any OIDC-compliant IdP.
           </p>
         </div>
         {existing && (
-          <Badge variant={existing.Enabled ? "default" : "secondary"}>
-            <ShieldCheck className="h-3 w-3 mr-1" />
-            {existing.Enabled ? "Active" : "Disabled"}
+          <Badge variant={existing.enabled ? "default" : "secondary"} className="mt-10 shrink-0">
+            <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+            {existing.enabled ? "Active" : "Disabled"}
           </Badge>
         )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>OIDC configuration</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg">OIDC configuration</CardTitle>
+          <CardDescription className="text-base">
             Your IdP must support OIDC discovery at{" "}
             <code className="text-xs">{"{issuer}"}/.well-known/openid-configuration</code>.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="sso-issuer">Issuer URL</Label>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="sso-issuer">Issuer URL</Label>
             <Input
               id="sso-issuer"
               placeholder="https://accounts.google.com"
@@ -158,8 +195,8 @@ export default function SSOPage() {
               onChange={(e) => setIssuer(e.target.value)}
             />
           </div>
-          <div>
-            <Label htmlFor="sso-client-id">Client ID</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="sso-client-id">Client ID</Label>
             <Input
               id="sso-client-id"
               placeholder="your-client-id"
@@ -167,13 +204,11 @@ export default function SSOPage() {
               onChange={(e) => setClientId(e.target.value)}
             />
           </div>
-          <div>
-            <Label htmlFor="sso-client-secret">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="sso-client-secret">
               Client secret{" "}
               {existing && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  (leave blank to keep existing)
-                </span>
+                <span className="font-normal text-muted-foreground">(leave blank to keep existing)</span>
               )}
             </Label>
             <Input
@@ -184,10 +219,10 @@ export default function SSOPage() {
               onChange={(e) => setClientSecret(e.target.value)}
             />
           </div>
-          <div>
-            <Label htmlFor="sso-redirect">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="sso-redirect">
               Redirect URL{" "}
-              <span className="text-xs font-normal text-muted-foreground">(optional — auto-derived from host)</span>
+              <span className="font-normal text-muted-foreground">(optional — auto-derived from host)</span>
             </Label>
             <Input
               id="sso-redirect"
@@ -197,46 +232,45 @@ export default function SSOPage() {
             />
           </div>
 
-          <div>
-            <Label htmlFor="sso-role-mapping">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="sso-role-mapping">
               Role mapping{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                (IdP group → platform role: admin or reviewer)
-              </span>
+              <span className="font-normal text-muted-foreground">(IdP group → platform role: admin or reviewer)</span>
             </Label>
             <Textarea
               id="sso-role-mapping"
               rows={5}
-              className="font-mono text-xs mt-1"
+              className="font-mono text-xs"
               value={roleMappingJson}
               onChange={(e) => setRoleMappingJson(e.target.value)}
             />
             {roleMappingError && (
-              <p className="text-xs text-destructive mt-1">{roleMappingError}</p>
+              <p className="text-sm text-destructive">{roleMappingError}</p>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <Switch id="sso-enabled" checked={enabled} onCheckedChange={setEnabled} />
-            <Label htmlFor="sso-enabled">SSO enabled</Label>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="text-base font-medium">SSO enabled</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Allow users to sign in via OIDC</p>
+            </div>
+            <Switch id="sso-enabled" checked={enabled} onCheckedChange={setEnabled} className="cursor-pointer" />
           </div>
 
-          <div className="flex items-center gap-3">
-            <Switch id="sso-enforced" checked={enforced} onCheckedChange={setEnforced} />
-            <Label htmlFor="sso-enforced">
-              Enforce SSO{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                (blocks GitHub OAuth login when enabled)
-              </span>
-            </Label>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="text-base font-medium">Enforce SSO</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Blocks GitHub OAuth login when enabled</p>
+            </div>
+            <Switch id="sso-enforced" checked={enforced} onCheckedChange={setEnforced} className="cursor-pointer" />
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button onClick={handleSave} disabled={saving || !issuer || !clientId}>
+          <div className="flex gap-3 pt-1">
+            <Button size="lg" onClick={handleSave} disabled={saving || !isDirty || !issuer || !clientId}>
               {saving ? "Saving…" : "Save configuration"}
             </Button>
             {existing && (
-              <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+              <Button size="lg" variant="destructive" onClick={() => setDeleteOpen(true)}>
                 Remove SSO
               </Button>
             )}
@@ -247,32 +281,28 @@ export default function SSOPage() {
       {existing && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Login URL</CardTitle>
-            <CardDescription>Share this link with users to initiate SSO login.</CardDescription>
+            <CardTitle className="text-lg">Login URL</CardTitle>
+            <CardDescription className="text-base">Share this link with users to initiate SSO login.</CardDescription>
           </CardHeader>
           <CardContent>
-            <code className="text-sm bg-muted rounded px-3 py-2 block">
-              {typeof window !== "undefined" ? window.location.origin : ""}/auth/oidc
+            <code className="text-sm bg-muted rounded-lg px-4 py-3 block break-all">
+              {process.env.NEXT_PUBLIC_API_URL ?? window.location.origin}/auth/oidc
             </code>
           </CardContent>
         </Card>
       )}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Remove SSO configuration?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl">Remove SSO configuration?</DialogTitle>
+            <DialogDescription className="text-base">
               Users will fall back to GitHub OAuth. This cannot be undone from this dialog.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
+            <Button size="lg" variant="ghost" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button size="lg" variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? "Removing…" : "Remove"}
             </Button>
           </DialogFooter>

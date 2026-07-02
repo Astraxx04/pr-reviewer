@@ -33,7 +33,7 @@ func (h *AuditHandler) List(w http.ResponseWriter, r *http.Request) {
 		q = q.Where("entity_type = ?", et)
 	}
 	if actor := r.URL.Query().Get("actor"); actor != "" {
-		q = q.Where("actor_login = ?", actor)
+		q = q.Where("LOWER(actor_login) LIKE LOWER(?)", "%"+actor+"%")
 	}
 	if since := r.URL.Query().Get("since"); since != "" {
 		for _, layout := range []string{time.RFC3339, "2006-01-02"} {

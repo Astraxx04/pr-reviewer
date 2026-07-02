@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
 	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	gh "github.com/Astraxx04/pr-reviewer/internal/github"
@@ -31,7 +32,6 @@ type githubAppStatus struct {
 	Configured       bool  `json:"configured"`
 	AppID            int64 `json:"app_id,omitempty"`
 	HasWebhookSecret bool  `json:"has_webhook_secret"`
-	HasGitHubToken   bool  `json:"has_github_token"`
 }
 
 func (h *GithubAppHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,6 @@ func (h *GithubAppHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Configured:       true,
 		AppID:            cfg.AppID,
 		HasWebhookSecret: cfg.WebhookSecretEncrypted != "",
-		HasGitHubToken:   cfg.GitHubTokenEncrypted != "",
 	})
 }
 
@@ -53,7 +52,6 @@ func (h *GithubAppHandler) Put(w http.ResponseWriter, r *http.Request) {
 		AppID         int64  `json:"app_id"`
 		PrivateKey    string `json:"private_key"`    // raw PEM; omit to leave unchanged
 		WebhookSecret string `json:"webhook_secret"` // raw; omit to leave unchanged
-		GitHubToken   string `json:"github_token"`   // PAT; omit to leave unchanged
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
@@ -101,24 +99,17 @@ func (h *GithubAppHandler) Put(w http.ResponseWriter, r *http.Request) {
 		cfg.WebhookSecretEncrypted = enc
 	}
 
-	if body.GitHubToken != "" {
-		enc, err := dbpkg.Encrypt(body.GitHubToken, h.encryptionKey)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "encryption failed")
-			return
-		}
-		cfg.GitHubTokenEncrypted = enc
-	}
-
 	if err := h.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&cfg).Error; err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "config.github_app_updated", "config", fmt.Sprint(cfg.AppID),
+		nil, map[string]any{"app_id": cfg.AppID})
 	writeJSON(w, http.StatusOK, githubAppStatus{
 		Configured:       true,
 		AppID:            cfg.AppID,
 		HasWebhookSecret: cfg.WebhookSecretEncrypted != "",
-		HasGitHubToken:   cfg.GitHubTokenEncrypted != "",
 	})
 }
 
@@ -129,6 +120,8 @@ func (h *GithubAppHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "delete failed")
 		return
 	}
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "config.github_app_deleted", "config", "", nil, nil)
 	writeJSON(w, http.StatusOK, githubAppStatus{Configured: false})
 }
 

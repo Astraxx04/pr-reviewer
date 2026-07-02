@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ThumbsUp, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, Code } from "lucide-react";
 import {
@@ -49,6 +49,12 @@ function priorityVariant(priority: string): "default" | "destructive" | "seconda
   if (priority === "p0" || priority === "p1") return "destructive";
   if (priority === "p2") return "secondary";
   return "outline";
+}
+
+function scoreColor(score: number): string {
+  if (score >= 80) return "text-green-600 dark:text-green-400";
+  if (score >= 60) return "text-yellow-600 dark:text-yellow-400";
+  return "text-destructive";
 }
 
 // ---- Diff parser ----
@@ -100,7 +106,6 @@ function DiffFileView({
   const [open, setOpen] = useState(true);
   const lines = parsePatch(file.patch);
 
-  // Build a map from new-line number to comments.
   const commentsByLine = new Map<number, PRComment[]>();
   for (const c of comments) {
     if (!commentsByLine.has(c.line)) commentsByLine.set(c.line, []);
@@ -116,7 +121,7 @@ function DiffFileView({
     <Card>
       <CardHeader className="pb-0">
         <button
-          className="flex items-center justify-between gap-2 w-full text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm"
+          className="flex items-center justify-between gap-2 w-full text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring rounded-sm"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls={`diff-${file.filename}`}
@@ -184,7 +189,7 @@ function DiffFileView({
                             {line.type === "hdr" ? (
                               <span className="text-muted-foreground">{line.content}</span>
                             ) : (
-                              line.content || " "
+                              line.content || " "
                             )}
                           </td>
                         </tr>
@@ -303,7 +308,6 @@ export default function PRDetailPage({
 
   const currentScore = pr.reviews.length > 0 ? pr.reviews[pr.reviews.length - 1].score : null;
 
-  // Build comment map: file → comments (for diff overlay)
   const commentsByFile = new Map<string, PRComment[]>();
   for (const c of pr.latest_comments ?? []) {
     if (!commentsByFile.has(c.path)) commentsByFile.set(c.path, []);
@@ -311,40 +315,42 @@ export default function PRDetailPage({
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push("/prs")} aria-label="Back to pull requests list">
-          ← PRs
+    <div className="space-y-8 max-w-4xl">
+      {/* Header */}
+      <div>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.push("/prs")} aria-label="Back to pull requests list">
+          ← Back
         </Button>
-        <h1 className="text-xl font-bold flex-1">{pr.title || `PR #${pr.number}`}</h1>
-        <Badge variant={prStatusVariant(pr.pr_status)}>{prStatusLabel(pr.pr_status)}</Badge>
-        {currentScore !== null && (
-          <span className="text-lg font-mono font-semibold" aria-label={`Score: ${currentScore} out of 100`}>
-            {currentScore}/100
-          </span>
-        )}
-        <Button size="sm" onClick={handleReReview} disabled={rereviewing} aria-label="Request re-review of this pull request">
-          {rereviewing ? "Queuing…" : "Request Re-review"}
-        </Button>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-3xl font-bold">{pr.title || `PR #${pr.number}`}</h1>
+          <Button size="lg" onClick={handleReReview} disabled={rereviewing} aria-label="Request re-review of this pull request" className="shrink-0">
+            {rereviewing ? "Queuing…" : "Re-review"}
+          </Button>
+        </div>
+        <div className="flex items-center gap-3 mt-3 flex-wrap">
+          <Badge variant={prStatusVariant(pr.pr_status)}>{prStatusLabel(pr.pr_status)}</Badge>
+          {currentScore !== null && (
+            <span className={`font-mono font-semibold text-lg ${scoreColor(currentScore)}`} aria-label={`Score: ${currentScore} out of 100`}>
+              {currentScore}/100
+            </span>
+          )}
+          <span className="text-base text-muted-foreground">#{pr.number}</span>
+          <span className="text-base text-muted-foreground">by <strong className="text-foreground">{pr.author}</strong></span>
+          <span className="font-mono text-sm text-muted-foreground">{pr.repo}</span>
+          {pr.assignees?.length > 0 && (
+            <span className="text-base text-muted-foreground">Assigned to: {pr.assignees.join(", ")}</span>
+          )}
+        </div>
       </div>
-
-      <dl className="text-sm text-muted-foreground flex gap-4 flex-wrap">
-        <div><dt className="sr-only">PR number</dt><dd>#{pr.number}</dd></div>
-        <div><dt className="sr-only">Author</dt><dd>by <strong>{pr.author}</strong></dd></div>
-        <div><dt className="sr-only">Repository</dt><dd className="font-mono">{pr.repo}</dd></div>
-        {pr.assignees?.length > 0 && (
-          <div><dt className="sr-only">Assigned to</dt><dd>Assigned to: {pr.assignees.join(", ")}</dd></div>
-        )}
-      </dl>
 
       {scoreHistory.length > 1 && (
         <Card>
-          <CardHeader><CardTitle>Score History</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-lg">Score History</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={180} aria-label="Score history chart">
               <LineChart data={scoreHistory}>
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 13 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 13 }} />
                 <Tooltip
                   formatter={(v) => [`${v}/100`, "Score"]}
                   contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
@@ -367,24 +373,24 @@ export default function PRDetailPage({
 
       {pr.reviews.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Review History</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-lg">Review History</CardTitle></CardHeader>
           <CardContent>
             <ul className="divide-y" role="list" aria-label="Review history">
               {[...pr.reviews].reverse().map((r) => (
-                <li key={r.id} className="py-3 flex items-start justify-between gap-4">
-                  <div className="space-y-1 flex-1">
+                <li key={r.id} className="py-4 flex items-start justify-between gap-4">
+                  <div className="space-y-1.5 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant={r.status === "APPROVE" ? "default" : r.status === "REQUEST_CHANGES" ? "destructive" : "secondary"}>
                         {r.status}
                       </Badge>
-                      <span className="font-mono text-sm" aria-label={`Score: ${r.score} out of 100`}>{r.score}/100</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="font-mono font-semibold" aria-label={`Score: ${r.score} out of 100`}>{r.score}/100</span>
+                      <span className="text-sm text-muted-foreground">
                         {r.comment_count} comment{r.comment_count !== 1 ? "s" : ""}
                       </span>
                     </div>
-                    {r.summary && <p className="text-sm text-muted-foreground line-clamp-2">{r.summary}</p>}
+                    {r.summary && <p className="text-base text-muted-foreground line-clamp-2">{r.summary}</p>}
                   </div>
-                  <time className="text-xs text-muted-foreground whitespace-nowrap" dateTime={r.created_at}>
+                  <time className="text-sm text-muted-foreground whitespace-nowrap" dateTime={r.created_at}>
                     {new Date(r.created_at).toLocaleString()}
                   </time>
                 </li>
@@ -394,10 +400,9 @@ export default function PRDetailPage({
         </Card>
       )}
 
-      {/* Diff view with inline comment annotations */}
       {diffs && diffs.length > 0 && (
         <section aria-label="File diffs with inline review comments">
-          <h2 className="text-lg font-semibold mb-4">
+          <h2 className="text-xl font-semibold mb-4">
             Changed Files
             <span className="ml-2 text-sm font-normal text-muted-foreground">
               ({diffs.length} file{diffs.length !== 1 ? "s" : ""})
@@ -415,29 +420,28 @@ export default function PRDetailPage({
         </section>
       )}
 
-      {/* Fallback: file-by-file comment list when no diff is available */}
       {!diffs && Object.keys(Object.fromEntries(commentsByFile)).length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Latest Review Comments</h2>
+          <h2 className="text-xl font-semibold">Latest Review Comments</h2>
           {Array.from(commentsByFile.entries()).map(([file, comments]) => (
             <Card key={file}>
               <CardHeader className="pb-2">
                 <CardTitle className="font-mono text-sm">{file}</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-3" role="list">
+                <ul className="space-y-4" role="list">
                   {comments.map((c) => (
-                    <li key={c.id} className={`text-sm border-l-2 pl-3 ${priorityBorderColor(c.priority)}`}>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs text-muted-foreground">Line {c.line}</span>
+                    <li key={c.id} className={`border-l-2 pl-3 ${priorityBorderColor(c.priority)}`}>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="text-sm text-muted-foreground">Line {c.line}</span>
                         <Badge variant={priorityVariant(c.priority)} className="text-xs">
                           {priorityLabel(c.priority)}
                         </Badge>
                         {c.has_reply && (
-                          <span className="text-xs text-muted-foreground">· replied</span>
+                          <span className="text-sm text-muted-foreground">· replied</span>
                         )}
                       </div>
-                      <p className="mb-2">{c.body}</p>
+                      <p className="text-base mb-2">{c.body}</p>
                       <div className="flex items-center gap-2" role="group" aria-label="Comment feedback">
                         <button
                           onClick={() => handleFeedback(c.id, 1)}
@@ -485,19 +489,20 @@ export default function PRDetailPage({
       )}
 
       {pr.latest_comments?.length === 0 && pr.reviews.length > 0 && (
-        <p className="text-muted-foreground text-sm" role="status">No comments on the latest review.</p>
+        <p className="text-base text-muted-foreground" role="status">No comments on the latest review.</p>
       )}
       {pr.reviews.length === 0 && (
-        <p className="text-muted-foreground text-sm" role="status">This PR has not been reviewed yet.</p>
+        <p className="text-base text-muted-foreground" role="status">This PR has not been reviewed yet.</p>
       )}
 
       {explanation && (
         <Dialog open={!!explanation} onOpenChange={(open) => { if (!open) setExplanation(null); }}>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <DialogHeader>
-              <DialogTitle>Why is this a problem?</DialogTitle>
+              <DialogTitle className="text-xl">Why is this a problem?</DialogTitle>
+              <DialogDescription>AI-generated explanation for this review finding.</DialogDescription>
             </DialogHeader>
-            <div className="text-sm whitespace-pre-wrap mt-2">{explanation.text}</div>
+            <p className="text-base whitespace-pre-wrap mt-2">{explanation.text}</p>
           </DialogContent>
         </Dialog>
       )}

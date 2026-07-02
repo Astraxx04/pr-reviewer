@@ -11,6 +11,7 @@ import (
 
 	"github.com/Astraxx04/pr-reviewer/internal/ai/llm"
 	"github.com/Astraxx04/pr-reviewer/internal/ai/llm/adapters"
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
 	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
@@ -44,17 +45,8 @@ func NewProviderHandler(db *gorm.DB, encryptionKey string) *ProviderHandler {
 	return &ProviderHandler{db: db, repo: repo.NewProviderRepo(db), encryptionKey: encryptionKey}
 }
 
-func (h *ProviderHandler) installationID(r *http.Request) uint {
-	user := getUser(r)
-	if user == nil {
-		return 0
-	}
-	return installationIDForUser(h.db, user.Login)
-}
-
 func (h *ProviderHandler) List(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	providers, err := h.repo.List(r.Context(), instID)
+	providers, err := h.repo.List(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed")
 		return
@@ -84,7 +76,6 @@ func (h *ProviderHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
 	var body struct {
 		Name               string `json:"name"`
 		Type               string `json:"type"`
@@ -111,7 +102,6 @@ func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	p := models.ProviderConfig{
-		InstallationID:     instID,
 		Name:               body.Name,
 		Type:               body.Type,
 		APIKeyEncrypted:    enc,
@@ -124,6 +114,9 @@ func (h *ProviderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "create failed")
 		return
 	}
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "provider.create", "provider", fmt.Sprint(p.ID),
+		nil, map[string]any{"name": p.Name, "type": p.Type})
 	writeJSON(w, http.StatusCreated, map[string]any{"id": p.ID})
 }
 
@@ -133,8 +126,7 @@ func (h *ProviderHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	instID := h.installationID(r)
-	p, err := h.repo.FindByID(r.Context(), id, instID)
+	p, err := h.repo.FindByID(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
@@ -178,6 +170,9 @@ func (h *ProviderHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "update failed")
 		return
 	}
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "provider.update", "provider", fmt.Sprint(p.ID),
+		nil, map[string]any{"name": p.Name, "type": p.Type})
 	writeJSON(w, http.StatusOK, map[string]any{"id": p.ID})
 }
 
@@ -187,11 +182,17 @@ func (h *ProviderHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	instID := h.installationID(r)
-	if err := h.repo.Delete(r.Context(), id, instID); err != nil {
+	p, _ := h.repo.FindByID(r.Context(), id)
+	if err := h.repo.Delete(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "delete failed")
 		return
 	}
+	user := getUser(r)
+	var before map[string]any
+	if p != nil {
+		before = map[string]any{"name": p.Name, "type": p.Type}
+	}
+	audit.Log(h.db, r, user.Login, user.ID, "provider.delete", "provider", fmt.Sprint(id), before, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -201,8 +202,7 @@ func (h *ProviderHandler) Test(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	instID := h.installationID(r)
-	p, err := h.repo.FindByID(r.Context(), id, instID)
+	p, err := h.repo.FindByID(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
@@ -249,7 +249,7 @@ func (h *ProviderHandler) ListModels(w http.ResponseWriter, r *http.Request) {
 
 	providerType, baseURL, apiKey := body.Type, body.BaseURL, body.APIKey
 	if body.ID != 0 {
-		p, err := h.repo.FindByID(r.Context(), body.ID, h.installationID(r))
+		p, err := h.repo.FindByID(r.Context(), body.ID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not found")
 			return
@@ -294,8 +294,7 @@ func (h *ProviderHandler) ListModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProviderHandler) Health(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	providers, err := h.repo.List(r.Context(), instID)
+	providers, err := h.repo.List(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed")
 		return

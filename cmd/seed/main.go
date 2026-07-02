@@ -64,15 +64,14 @@ func main() {
 	// ------------------------------------------------------------------ //
 	apiAgentConfig := datatypes.JSON([]byte(`{"agents":{"code-review":{"provider_id":"1","model":"gpt-4o"}}}`))
 	repoSpecs := []models.Repository{
-		{InstallationID: inst.ID, Owner: "demo-org", Name: "api-service", Enabled: true, IndexingStatus: "indexed", Config: apiAgentConfig},
-		{InstallationID: inst.ID, Owner: "demo-org", Name: "web-frontend", Enabled: true, IndexingStatus: "indexed"},
-		{InstallationID: inst.ID, Owner: "demo-org", Name: "infra-tools", Enabled: false},
+		{Owner: "demo-org", Name: "api-service", Enabled: true, IndexingStatus: "indexed", Config: apiAgentConfig},
+		{Owner: "demo-org", Name: "web-frontend", Enabled: true, IndexingStatus: "indexed"},
+		{Owner: "demo-org", Name: "infra-tools", Enabled: false},
 	}
 	for i := range repoSpecs {
 		gormDB.Where(models.Repository{
-			InstallationID: inst.ID,
-			Owner:          repoSpecs[i].Owner,
-			Name:           repoSpecs[i].Name,
+			Owner: repoSpecs[i].Owner,
+			Name:  repoSpecs[i].Name,
 		}).FirstOrCreate(&repoSpecs[i])
 	}
 	apiServiceRepo := repoSpecs[0]
@@ -83,20 +82,7 @@ func main() {
 	rule := models.AssignmentRule{RepoID: apiServiceRepo.ID, Strategy: "round-robin", Config: ruleConfig}
 	gormDB.Where(models.AssignmentRule{RepoID: apiServiceRepo.ID, Strategy: "round-robin"}).FirstOrCreate(&rule)
 
-	// ------------------------------------------------------------------ //
-	// 4. Team members
-	// ------------------------------------------------------------------ //
-	members := []models.TeamMember{
-		{InstallationID: inst.ID, Login: "alice", Role: "admin"},
-		{InstallationID: inst.ID, Login: "bob", Role: "reviewer"},
-		{InstallationID: inst.ID, Login: "carol", Role: "reviewer"},
-	}
-	for i := range members {
-		gormDB.Where(models.TeamMember{
-			InstallationID: inst.ID,
-			Login:          members[i].Login,
-		}).FirstOrCreate(&members[i])
-	}
+	// Team members are now seeded via the invite system; no seed data needed here.
 
 	// ------------------------------------------------------------------ //
 	// 5. PRs + reviews for api-service
@@ -335,13 +321,12 @@ func main() {
 	// 7. ProviderConfig + health
 	// ------------------------------------------------------------------ //
 	provider := models.ProviderConfig{
-		InstallationID:     inst.ID,
 		Name:               "OpenAI GPT-4o",
 		Type:               "openai",
 		DefaultModel:       "gpt-4o",
 		SupportsEmbeddings: false,
 	}
-	gormDB.Where(models.ProviderConfig{InstallationID: inst.ID, Name: "OpenAI GPT-4o"}).
+	gormDB.Where(models.ProviderConfig{Name: "OpenAI GPT-4o"}).
 		FirstOrCreate(&provider)
 
 	health := models.ProviderHealth{
@@ -361,12 +346,11 @@ func main() {
 		"template":        "",
 	})
 	notif := models.NotificationConfig{
-		InstallationID: inst.ID,
-		Channel:        "slack",
-		Config:         notifCfgJSON,
-		Enabled:        true,
+		Channel: "slack",
+		Config:  notifCfgJSON,
+		Enabled: true,
 	}
-	gormDB.Where(models.NotificationConfig{InstallationID: inst.ID, Channel: "slack"}).
+	gormDB.Where(models.NotificationConfig{Channel: "slack"}).
 		FirstOrCreate(&notif)
 
 	// ------------------------------------------------------------------ //

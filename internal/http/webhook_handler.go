@@ -105,6 +105,8 @@ func (h *WebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		h.handleInstallation(r.Context(), payload, w)
 	case "installation_repositories":
 		h.handleInstallationRepos(r.Context(), payload, w)
+	case "organization":
+		h.handleOrganization(r.Context(), payload, w)
 	default:
 		metrics.WebhookRequestsTotal.WithLabelValues("skipped").Inc()
 		w.WriteHeader(http.StatusOK)
@@ -293,13 +295,12 @@ func (h *WebhookHandler) handleInstallation(ctx context.Context, payload []byte,
 		// Upsert repos included in the installation payload.
 		for _, r := range event.Installation.Repositories {
 			owner, name := splitFullName(r.FullName)
-			upsertRepo(ctx, h.db, inst.ID, owner, name)
+			upsertRepo(ctx, h.db, owner, name)
 		}
 
 	case "deleted":
 		var inst models.Installation
 		if h.db.Where("github_installation_id = ?", event.Installation.ID).First(&inst).Error == nil {
-			h.db.Where("installation_id = ?", inst.ID).Delete(&models.Repository{})
 			h.db.Delete(&inst)
 		}
 	}
@@ -321,21 +322,14 @@ func (h *WebhookHandler) handleInstallationRepos(ctx context.Context, payload []
 		return
 	}
 
-	var inst models.Installation
-	if err := h.db.Where("github_installation_id = ?", event.Installation.ID).First(&inst).Error; err != nil {
-		h.log.Error("installation not found for repos event", "installation_id", event.Installation.ID)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	for _, r := range event.RepositoriesAdded {
 		owner, name := splitFullName(r.FullName)
-		upsertRepo(ctx, h.db, inst.ID, owner, name)
+		upsertRepo(ctx, h.db, owner, name)
 	}
 	for _, r := range event.RepositoriesRemoved {
 		owner, name := splitFullName(r.FullName)
 		h.db.WithContext(ctx).
-			Where("installation_id = ? AND owner = ? AND name = ?", inst.ID, owner, name).
+			Where("owner = ? AND name = ?", owner, name).
 			Delete(&models.Repository{})
 	}
 
@@ -346,10 +340,45 @@ func (h *WebhookHandler) handleInstallationRepos(ctx context.Context, payload []
 	w.WriteHeader(http.StatusOK)
 }
 
-func upsertRepo(ctx context.Context, db *gorm.DB, installationID uint, owner, name string) {
-	// Keyed on (owner, name) via the shared helper so it can't create a
-	// duplicate of a repo already created under a stub installation.
-	_, _, _ = repo.UpsertRepository(ctx, db, installationID, owner, name, false)
+// handleOrganization processes organization webhook events.
+// A member_removed action immediately suspends the user and wipes their sessions.
+func (h *WebhookHandler) handleOrganization(ctx context.Context, payload []byte, w http.ResponseWriter) {
+	var event struct {
+		Action     string `json:"action"`
+		Membership struct {
+			User struct {
+				Login string `json:"login"`
+			} `json:"user"`
+		} `json:"membership"`
+	}
+	if err := json.Unmarshal(payload, &event); err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	login := event.Membership.User.Login
+	if event.Action != "member_removed" || login == "" || h.db == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var user models.User
+	if h.db.WithContext(ctx).Where("login = ?", login).First(&user).Error != nil {
+		// Not a platform user — nothing to do.
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	h.db.WithContext(ctx).Model(&user).Update("status", "suspended")
+	h.db.WithContext(ctx).Where("user_id = ?", user.ID).Delete(&models.Session{})
+
+	h.log.Info("user suspended via org webhook", "login", login)
+	metrics.WebhookRequestsTotal.WithLabelValues("org_member_removed").Inc()
+	w.WriteHeader(http.StatusOK)
+}
+
+func upsertRepo(ctx context.Context, db *gorm.DB, owner, name string) {
+	_, _, _ = repo.UpsertRepository(ctx, db, owner, name, false)
 }
 
 func splitFullName(fullName string) (owner, name string) {

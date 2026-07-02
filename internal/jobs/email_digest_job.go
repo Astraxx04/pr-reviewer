@@ -62,7 +62,7 @@ func (w *EmailDigestWorker) Work(ctx context.Context, job *river.Job[EmailDigest
 			continue
 		}
 
-		rows := w.aggregate(ctx, cfg.InstallationID, cfg.RepoID, since)
+		rows := w.aggregate(ctx, cfg.RepoID, since)
 		if len(rows) == 0 {
 			continue // nothing to report this period
 		}
@@ -92,14 +92,13 @@ type digestRow struct {
 	CreatedAt time.Time
 }
 
-func (w *EmailDigestWorker) aggregate(ctx context.Context, installationID uint, repoID *uint, since time.Time) []digestRow {
+func (w *EmailDigestWorker) aggregate(ctx context.Context, repoID *uint, since time.Time) []digestRow {
 	tx := w.DB.WithContext(ctx).
 		Table("reviews").
 		Select(`repositories.owner, repositories.name as repo_name, pull_requests.number as pr_number,
 			pull_requests.title, reviews.status, reviews.score, reviews.created_at`).
 		Joins("JOIN pull_requests ON pull_requests.id = reviews.pr_id").
 		Joins("JOIN repositories ON repositories.id = pull_requests.repo_id").
-		Where("repositories.installation_id = ?", installationID).
 		Where("reviews.created_at >= ?", since).
 		Order("reviews.created_at desc")
 	if repoID != nil {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/Astraxx04/pr-reviewer/internal/ai"
 	"github.com/Astraxx04/pr-reviewer/internal/ai/mcp"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 	"github.com/Astraxx04/pr-reviewer/pkg/logger"
@@ -32,14 +33,21 @@ func (ConversationJobArgs) Kind() string { return "conversation" }
 type ConversationWorker struct {
 	river.WorkerDefaults[ConversationJobArgs]
 
-	GHClient     gh.Client
-	DB           *gorm.DB
-	Log          *logger.Logger
-	Orchestrator *ai.AgentOrchestrator
+	TokenCache    *gh.InstallationTokenCache
+	DB            *gorm.DB
+	Log           *logger.Logger
+	Orchestrator  *ai.AgentOrchestrator
+	EncryptionKey string
 }
 
 func (w *ConversationWorker) Work(ctx context.Context, job *river.Job[ConversationJobArgs]) error {
 	args := job.Args
+
+	instClient, err := db.ResolveInstallationClient(ctx, w.DB, w.EncryptionKey, w.TokenCache)
+	if err != nil {
+		w.Log.Error("failed to resolve GitHub installation client", "error", err)
+		return err
+	}
 
 	// Idempotency: skip if we already replied to this thread.
 	var existing models.BotReply
@@ -70,7 +78,7 @@ func (w *ConversationWorker) Work(ctx context.Context, job *river.Job[Conversati
 		return nil
 	}
 
-	if err := w.GHClient.PostReviewCommentReply(ctx, args.Owner, args.Repo, args.Number, args.InReplyToID, conv.Body); err != nil {
+	if err := instClient.PostReviewCommentReply(ctx, args.Owner, args.Repo, args.Number, args.InReplyToID, conv.Body); err != nil {
 		w.Log.Error("failed to post conversation reply", "error", err)
 		return err
 	}

@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 
 // On an auth failure (expired/revoked session, missing or invalid token) clear
 // the stored token and bounce to /login, so a stale session sends the user to
@@ -31,7 +31,12 @@ async function apiFetch<T>(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    if (res.status === 401) handleAuthFailure();
+    if (res.status === 401) {
+      handleAuthFailure();
+      // Page is redirecting — return a promise that never settles so callers
+      // don't receive a rejection they'd need to handle.
+      return new Promise<T>(() => {});
+    }
     throw new Error(err.error ?? "API error");
   }
   if (res.status === 204) return undefined as T;
@@ -53,7 +58,7 @@ export function syncRepos(token: string) {
 export function getGithubApp(token: string) {
   return apiFetch<GithubAppStatus>("/api/settings/github-app", { token });
 }
-export function putGithubApp(token: string, body: { app_id: number; private_key: string; webhook_secret?: string; github_token?: string }) {
+export function putGithubApp(token: string, body: { app_id: number; private_key: string; webhook_secret?: string }) {
   return apiFetch<GithubAppStatus>("/api/settings/github-app", {
     method: "PUT", token, body: JSON.stringify(body),
   });
@@ -90,18 +95,63 @@ export function getDashboardStats(token: string) {
 export function listTeam(token: string) {
   return apiFetch<TeamMember[]>("/api/team", { token });
 }
-export function addTeamMember(token: string, login: string, role = "reviewer", email?: string) {
-  return apiFetch<TeamMember>("/api/team/members", {
-    method: "POST", token, body: JSON.stringify({ login, role, email: email || undefined }),
-  });
-}
-export function updateTeamMember(token: string, id: number, role: string) {
-  return apiFetch<void>(`/api/team/members/${id}`, {
+// Role update for existing users (settings/team page).
+export function updateUserRole(token: string, id: number, role: string) {
+  return apiFetch<void>(`/api/users/${id}/role`, {
     method: "PATCH", token, body: JSON.stringify({ role }),
   });
 }
-export function removeTeamMember(token: string, id: number) {
-  return apiFetch<void>(`/api/team/members/${id}`, { method: "DELETE", token });
+
+export function removeUser(token: string, id: number) {
+  return apiFetch<void>(`/api/users/${id}`, { method: "DELETE", token });
+}
+
+export function reactivateUser(token: string, id: number) {
+  return apiFetch<void>(`/api/users/${id}/approve`, { method: "PATCH", token });
+}
+
+// --- invites ---
+export interface Invite {
+  id: string;
+  email: string;
+  role: string;
+  invited_by: string;
+  expires_at: string;
+  accepted_at?: string;
+  accepted_by?: string;
+  created_at: string;
+  pending: boolean;
+}
+
+export function listInvites(token: string, status?: "pending" | "accepted") {
+  const q = status ? `?status=${status}` : "";
+  return apiFetch<Invite[]>(`/api/invites${q}`, { token });
+}
+
+export function createInvite(token: string, body: { email: string; role: string }) {
+  return apiFetch<Invite>("/api/invites", { method: "POST", token, body: JSON.stringify(body) });
+}
+
+export function bulkInvite(token: string, body: { role: string; emails: string[] }) {
+  return apiFetch<{ results: Record<string, string> }>("/api/invites/bulk", {
+    method: "POST", token, body: JSON.stringify(body),
+  });
+}
+
+export function revokeInvite(token: string, id: string) {
+  return apiFetch<void>(`/api/invites/${id}`, { method: "DELETE", token });
+}
+
+export function resendInvite(token: string, id: string) {
+  return apiFetch<{ id: string; email: string; expires_at: string }>(`/api/invites/${id}/resend`, {
+    method: "POST", token,
+  });
+}
+
+export function validateInviteToken(rawToken: string) {
+  return apiFetch<{ email: string; role: string; invited_by: string; expires_at: string }>(
+    `/api/invites/validate?token=${encodeURIComponent(rawToken)}`
+  );
 }
 
 // --- analytics ---
@@ -218,7 +268,6 @@ export interface WebhookConfig {
 
 export interface NotificationConfig {
   ID: number;
-  InstallationID: number;
   RepoID: number | null;
   Channel: NotificationChannel;
   Config: SlackConfig | EmailConfig | WebhookConfig;
@@ -261,12 +310,33 @@ export function triggerDigest(token: string, period: "daily" | "weekly" = "daily
 }
 
 // --- export ---
-export function exportReviewsCSVUrl(token: string, params: { start?: string; end?: string; repo?: string } = {}): string {
+export async function downloadReviewsCSV(
+  token: string,
+  params: { start?: string; end?: string; repo?: string } = {}
+): Promise<void> {
   const q = new URLSearchParams();
   if (params.start) q.set("start", params.start);
   if (params.end) q.set("end", params.end);
   if (params.repo) q.set("repo", params.repo);
-  return `/api/reviews/export?${q}`;
+  const res = await fetch(`${API_BASE}/api/reviews/export?${q}`, {
+    headers: {
+      "ngrok-skip-browser-warning": "true",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    if (res.status === 401) handleAuthFailure();
+    throw new Error("CSV export failed");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `reviews_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // downloadReviewsPDF fetches the PDF report with the auth header and triggers a browser
@@ -360,8 +430,26 @@ export function listAuditLogs(
   return apiFetch<AuditLogList>(`/api/audit?${q}`, { token });
 }
 
-export function auditExportCSVUrl(): string {
-  return `/api/audit/export`;
+export async function downloadAuditCSV(token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/audit/export`, {
+    headers: {
+      "ngrok-skip-browser-warning": "true",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    if (res.status === 401) handleAuthFailure();
+    throw new Error("CSV export failed");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `audit_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // --- API tokens ---
@@ -499,14 +587,15 @@ export function testSlackApp(token: string) {
 
 // --- SSO / OIDC ---
 export interface SSOConfig {
-  ID: number;
-  Issuer: string;
-  ClientID: string;
-  RedirectURL: string;
-  AttributeMapping: Record<string, string>;
-  RoleMapping: Record<string, string>;
-  Enforced: boolean;
-  Enabled: boolean;
+  configured?: boolean;
+  issuer: string;
+  client_id: string;
+  has_client_secret?: boolean;
+  redirect_url?: string;
+  attribute_mapping?: Record<string, any>;
+  role_mapping?: Record<string, any>;
+  enforced: boolean;
+  enabled: boolean;
 }
 
 export function getSSOConfig(token: string) {
@@ -606,10 +695,12 @@ export interface DashboardStats {
 }
 
 export interface TeamMember {
-  ID: number;
-  Login: string;
-  Role: string;
-  CreatedAt: string;
+  id: number;
+  login: string;
+  avatar_url: string;
+  role: string;
+  status: string;
+  created_at?: string;
 }
 
 export interface AnalyticsData {
@@ -642,7 +733,6 @@ export interface GithubAppStatus {
   configured: boolean;
   app_id?: number;
   has_webhook_secret: boolean;
-  has_github_token: boolean;
 }
 
 export interface SetupStatus {

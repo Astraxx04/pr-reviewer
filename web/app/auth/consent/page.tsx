@@ -19,7 +19,7 @@ function Consent() {
 
   if (!token) {
     return (
-      <p className="text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         Invalid or expired sign-in request. Please start over.
       </p>
     );
@@ -27,9 +27,9 @@ function Consent() {
 
   return (
     <Card className="w-full max-w-sm">
-      <CardHeader className="text-center">
-        <CardTitle>Authorize sign-in</CardTitle>
-        <CardDescription>
+      <CardHeader className="text-center pb-4">
+        <CardTitle className="text-2xl">Authorize sign-in</CardTitle>
+        <CardDescription className="text-base mt-2">
           {login ? (
             <>
               You&apos;re signing in to PR Reviewer as{" "}
@@ -49,7 +49,7 @@ function Consent() {
           <Button
             type="submit"
             size="lg"
-            className="w-full"
+            className="w-full text-base"
           >
             Yes, continue
           </Button>

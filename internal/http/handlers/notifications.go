@@ -3,12 +3,14 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"github.com/Astraxx04/pr-reviewer/internal/jobs"
 	"github.com/Astraxx04/pr-reviewer/internal/notifications"
@@ -47,25 +49,10 @@ func (h *NotificationHandler) TriggerDigest(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "period": period})
 }
 
-func (h *NotificationHandler) installationID(r *http.Request) uint {
-	user := getUser(r)
-	if user == nil {
-		return 0
-	}
-	return installationIDForUser(h.db, user.Login)
-}
-
-// List returns all notification configs for the installation.
+// List returns all notification configs.
 func (h *NotificationHandler) List(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	if instID == 0 {
-		// No installation yet — return empty list so the UI shows the empty state.
-		writeJSON(w, http.StatusOK, []models.NotificationConfig{})
-		return
-	}
 	var cfgs []models.NotificationConfig
 	if err := h.db.WithContext(r.Context()).
-		Where("installation_id = ?", instID).
 		Order("id ASC").
 		Find(&cfgs).Error; err != nil {
 		writeError(w, http.StatusInternalServerError, "query failed")
@@ -86,11 +73,6 @@ type notifConfigInput struct {
 
 // Create adds a new notification config.
 func (h *NotificationHandler) Create(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	if instID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
 	var input notifConfigInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
@@ -110,38 +92,33 @@ func (h *NotificationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := models.NotificationConfig{
-		InstallationID: instID,
-		RepoID:         input.RepoID,
-		Channel:        input.Channel,
-		Config:         datatypes.JSON(stored),
-		Enabled:        enabled,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+		RepoID:    input.RepoID,
+		Channel:   input.Channel,
+		Config:    datatypes.JSON(stored),
+		Enabled:   enabled,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	if err := h.db.WithContext(r.Context()).Create(&cfg).Error; err != nil {
 		writeError(w, http.StatusInternalServerError, "create failed")
 		return
 	}
 	cfg.Config = datatypes.JSON(notifications.RedactConfig(cfg.Channel, cfg.Config))
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "config.notification_created", "config", fmt.Sprint(cfg.ID),
+		nil, map[string]any{"channel": cfg.Channel})
 	writeJSON(w, http.StatusCreated, cfg)
 }
 
 // Update replaces a notification config.
 func (h *NotificationHandler) Update(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	if instID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
 	id, ok := pathID(r, "id")
 	if !ok {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 	var existing models.NotificationConfig
-	if err := h.db.WithContext(r.Context()).
-		Where("id = ? AND installation_id = ?", id, instID).
-		First(&existing).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&existing, id).Error; err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
@@ -175,24 +152,20 @@ func (h *NotificationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	existing.Config = datatypes.JSON(notifications.RedactConfig(existing.Channel, existing.Config))
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "config.notification_updated", "config", fmt.Sprint(existing.ID),
+		nil, map[string]any{"channel": existing.Channel})
 	writeJSON(w, http.StatusOK, existing)
 }
 
 // Delete removes a notification config.
 func (h *NotificationHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	if instID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
 	id, ok := pathID(r, "id")
 	if !ok {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	result := h.db.WithContext(r.Context()).
-		Where("id = ? AND installation_id = ?", id, instID).
-		Delete(&models.NotificationConfig{})
+	result := h.db.WithContext(r.Context()).Delete(&models.NotificationConfig{}, id)
 	if result.Error != nil {
 		writeError(w, http.StatusInternalServerError, "delete failed")
 		return
@@ -201,25 +174,20 @@ func (h *NotificationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
+	user := getUser(r)
+	audit.Log(h.db, r, user.Login, user.ID, "config.notification_deleted", "config", fmt.Sprint(id), nil, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // Test sends a test notification for the given config.
 func (h *NotificationHandler) Test(w http.ResponseWriter, r *http.Request) {
-	instID := h.installationID(r)
-	if instID == 0 {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
 	id, ok := pathID(r, "id")
 	if !ok {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
 	var cfg models.NotificationConfig
-	if err := h.db.WithContext(r.Context()).
-		Where("id = ? AND installation_id = ?", id, instID).
-		First(&cfg).Error; err != nil {
+	if err := h.db.WithContext(r.Context()).First(&cfg, id).Error; err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}

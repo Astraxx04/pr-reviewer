@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,30 +19,32 @@ import (
 	githuboauth "golang.org/x/oauth2/github"
 	"gorm.io/gorm"
 
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
 	"github.com/Astraxx04/pr-reviewer/internal/http/middleware"
+	"github.com/Astraxx04/pr-reviewer/internal/notifications"
 	"github.com/Astraxx04/pr-reviewer/pkg/logger"
 )
 
 type AuthHandler struct {
-	oauth2Cfg   *oauth2.Config
-	jwtSecret   []byte
-	jwtTTL      time.Duration
-	frontendURL string
-	userRepo    *repo.UserRepo
-	sessionRepo *repo.SessionRepo
-	db          *gorm.DB
-	requiredOrg string
-	inviteOnly  bool
+	oauth2Cfg     *oauth2.Config
+	jwtSecret     []byte
+	jwtTTL        time.Duration
+	frontendURL   string
+	userRepo      *repo.UserRepo
+	sessionRepo   *repo.SessionRepo
+	db            *gorm.DB
+	requiredOrg   string
+	encryptionKey string
 }
 
 func NewAuthHandler(
 	clientID, clientSecret, jwtSecret, frontendURL, serverURL string,
 	db *gorm.DB,
 	requiredOrg string,
-	inviteOnly bool,
 	jwtTTLHours int,
+	encryptionKey string,
 ) *AuthHandler {
 	ttl := time.Duration(jwtTTLHours) * time.Hour
 	if ttl <= 0 {
@@ -55,14 +58,14 @@ func NewAuthHandler(
 			Endpoint:     githuboauth.Endpoint,
 			RedirectURL:  serverURL + "/auth/github/callback",
 		},
-		jwtSecret:   []byte(jwtSecret),
-		jwtTTL:      ttl,
-		frontendURL: frontendURL,
-		userRepo:    repo.NewUserRepo(db),
-		sessionRepo: repo.NewSessionRepo(db),
-		db:          db,
-		requiredOrg: requiredOrg,
-		inviteOnly:  inviteOnly,
+		jwtSecret:     []byte(jwtSecret),
+		jwtTTL:        ttl,
+		frontendURL:   frontendURL,
+		userRepo:      repo.NewUserRepo(db),
+		sessionRepo:   repo.NewSessionRepo(db),
+		db:            db,
+		requiredOrg:   requiredOrg,
+		encryptionKey: encryptionKey,
 	}
 }
 
@@ -84,6 +87,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "cli_redirect",
 			Value:    cliRedirect,
+			Path:     "/",
+			MaxAge:   300,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
+
+	// Carry an invite token through the OAuth round-trip in a short-lived cookie.
+	if inviteToken := r.URL.Query().Get("invite"); inviteToken != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "oauth_invite",
+			Value:    inviteToken,
 			Path:     "/",
 			MaxAge:   300,
 			HttpOnly: true,
@@ -134,26 +149,64 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3.1 — Org membership gate.
-	if h.requiredOrg != "" {
-		memberStart := time.Now()
-		isMember, _, err := ghClient.Organizations.IsMember(r.Context(), h.requiredOrg, ghUser.GetLogin())
-		logger.ExternalCall(r.Context(), "github", "Organizations.IsMember", memberStart, err, "org", h.requiredOrg, "login", ghUser.GetLogin())
-		if err != nil || !isMember {
+	// Org membership check — always enforced; REQUIRED_ORG is a mandatory env var.
+	// Use GetOrgMembership (/user/memberships/orgs/{org}) rather than IsMember
+	// (/orgs/{org}/members/{username}): the latter returns 302 for private memberships,
+	// which go-github parses as false/nil (no error), silently blocking valid members.
+	memberStart := time.Now()
+	membership, _, memberErr := ghClient.Organizations.GetOrgMembership(r.Context(), "", h.requiredOrg)
+	logger.ExternalCall(r.Context(), "github", "Organizations.GetOrgMembership", memberStart, memberErr, "org", h.requiredOrg, "login", ghUser.GetLogin())
+	if memberErr != nil || membership.GetState() != "active" {
+		http.Redirect(w, r,
+			fmt.Sprintf("%s/auth/error?reason=org_required&org=%s", h.frontendURL, url.QueryEscape(h.requiredOrg)),
+			http.StatusTemporaryRedirect,
+		)
+		return
+	}
+
+	// Fetch verified email list once — used for both primary-email resolution and
+	// invite email matching (avoids a second round-trip on the invite path).
+	emailListStart := time.Now()
+	ghEmails, _, _ := ghClient.Users.ListEmails(r.Context(), &gogithub.ListOptions{PerPage: 100})
+	logger.ExternalCall(r.Context(), "github", "Users.ListEmails", emailListStart, nil)
+
+	// Read invite token from the short-lived cookie set by Login.
+	inviteCookie, _ := r.Cookie("oauth_invite")
+	http.SetCookie(w, &http.Cookie{Name: "oauth_invite", MaxAge: -1, Path: "/"})
+
+	var acceptedInvite *models.Invite
+	if inviteCookie != nil && inviteCookie.Value != "" {
+		sum := sha256.Sum256([]byte(inviteCookie.Value))
+		tokenHash := hex.EncodeToString(sum[:])
+
+		var invite models.Invite
+		if err := h.db.WithContext(r.Context()).
+			Where("token_hash = ? AND accepted_at IS NULL AND expires_at > ?", tokenHash, time.Now()).
+			First(&invite).Error; err != nil {
+			http.Redirect(w, r, h.frontendURL+"/auth/error?reason=invite_invalid", http.StatusTemporaryRedirect)
+			return
+		}
+
+		if !emailVerifiedOnGitHub(ghEmails, invite.Email) {
 			http.Redirect(w, r,
-				fmt.Sprintf("%s/auth/error?reason=org_required&org=%s", h.frontendURL, h.requiredOrg),
+				fmt.Sprintf("%s/auth/error?reason=email_mismatch&email=%s&login=%s",
+					h.frontendURL,
+					url.QueryEscape(invite.Email),
+					url.QueryEscape(ghUser.GetLogin()),
+				),
 				http.StatusTemporaryRedirect,
 			)
 			return
 		}
+		acceptedInvite = &invite
 	}
 
 	// Determine role/status for this login attempt.
 	userCount, _ := h.userRepo.Count(r.Context())
 
-	// Resolve the notification email. If GitHub gives us nothing this time, keep any
-	// address we already have on file rather than blanking it on the upsert.
-	email := resolvePrimaryEmail(r.Context(), ghClient, ghUser.GetEmail())
+	// Resolve the notification email from the already-fetched list; fall back to
+	// any address already on file to avoid blanking it on re-login.
+	email := resolvePrimaryEmailFromList(ghUser.GetEmail(), ghEmails)
 	if email == "" {
 		if existing, err := h.userRepo.FindByGithubID(r.Context(), ghUser.GetID()); err == nil {
 			email = existing.Email
@@ -167,23 +220,23 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		AvatarURL: ghUser.GetAvatarURL(),
 	}
 
-	// 3.2 — First user becomes owner; check TeamMember pre-authorization; else invite-only or viewer.
 	if userCount == 0 {
+		// First user becomes owner (initial setup, no invite required).
 		newUser.Role = "owner"
 		newUser.Status = "active"
+	} else if acceptedInvite != nil {
+		// New user arriving via a valid invite link.
+		newUser.Role = acceptedInvite.Role
+		newUser.Status = "active"
 	} else {
-		// Check if an admin pre-authorized this login with a specific role.
-		var tm models.TeamMember
-		if h.db.Where("login = ?", ghUser.GetLogin()).First(&tm).Error == nil {
-			newUser.Role = tm.Role
-			newUser.Status = "active"
-		} else if h.inviteOnly {
-			// Only set pending for genuinely new users; existing users keep their status.
-			newUser.Status = "pending"
-			newUser.Role = "viewer"
+		// Returning user — preserve their current role/status.
+		if existing, err := h.userRepo.FindByGithubID(r.Context(), ghUser.GetID()); err == nil {
+			newUser.Role = existing.Role
+			newUser.Status = existing.Status
 		} else {
-			newUser.Role = "viewer"
-			newUser.Status = "active"
+			// Unknown user with no invite token.
+			http.Redirect(w, r, h.frontendURL+"/auth/error?reason=invite_required", http.StatusTemporaryRedirect)
+			return
 		}
 	}
 
@@ -192,21 +245,34 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-fetch to get the actual DB-assigned role/status (preserves existing users' roles).
+	// Re-fetch to get the actual DB-assigned role/status.
 	dbUser, err := h.userRepo.FindByGithubID(r.Context(), newUser.GithubID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "user lookup failed")
 		return
 	}
 
-	// Reject pending users with a redirect.
-	if dbUser.Status == "pending" {
-		http.Redirect(w, r,
-			h.frontendURL+"/auth/error?reason=pending_approval",
-			http.StatusTemporaryRedirect,
-		)
+	// Block suspended users before any session is created.
+	if dbUser.Status == "suspended" {
+		http.Redirect(w, r, h.frontendURL+"/auth/error?reason=suspended", http.StatusTemporaryRedirect)
 		return
 	}
+
+	// Mark invite accepted and notify the inviting admin.
+	if acceptedInvite != nil {
+		now := time.Now()
+		h.db.WithContext(r.Context()).Model(acceptedInvite).Updates(map[string]any{
+			"accepted_at": &now,
+			"accepted_by": ghUser.GetLogin(),
+		})
+		audit.Log(h.db, r, ghUser.GetLogin(), dbUser.ID, "invite.accepted", "user", acceptedInvite.ID,
+			nil, map[string]any{"email": acceptedInvite.Email, "role": acceptedInvite.Role})
+		go h.sendAcceptanceNotification(context.Background(), acceptedInvite, ghUser.GetLogin())
+	}
+
+	// Kick off a background repo-access sync for this user so fail-closed repo
+	// visibility is populated before their first page load.
+	go syncLoginRepoAccess(context.Background(), h.db, h.encryptionKey, ghUser.GetLogin())
 
 	// Detect a CLI login from the loopback cookie and carry the target forward in
 	// the pre-auth token, so we don't depend on the cookie surviving the consent
@@ -306,8 +372,8 @@ func (h *AuthHandler) ContinueLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "user lookup failed")
 		return
 	}
-	if dbUser.Status == "pending" {
-		http.Redirect(w, r, h.frontendURL+"/auth/error?reason=pending_approval", http.StatusSeeOther)
+	if dbUser.Status == "suspended" {
+		http.Redirect(w, r, h.frontendURL+"/auth/error?reason=suspended", http.StatusSeeOther)
 		return
 	}
 
@@ -393,20 +459,12 @@ func renderConsentPage(w http.ResponseWriter, login, preAuth string) {
 	}{Login: login, PreAuth: preAuth})
 }
 
-// resolvePrimaryEmail returns the user's email for notification routing. GitHub's
-// profile email (ghUser.GetEmail) is blank when the user keeps it private — the
-// default — so when it's empty we fall back to GET /user/emails (the OAuth flow
-// already requests the user:email scope) and pick the primary verified address,
-// then any verified address. Returns "" if none can be resolved.
-func resolvePrimaryEmail(ctx context.Context, ghClient *gogithub.Client, profileEmail string) string {
+// resolvePrimaryEmailFromList picks the best notification email from a pre-fetched list.
+// Returns the profile email if non-empty, then the primary verified address, then any
+// verified address. Returns "" if none can be resolved.
+func resolvePrimaryEmailFromList(profileEmail string, emails []*gogithub.UserEmail) string {
 	if profileEmail != "" {
 		return profileEmail
-	}
-	start := time.Now()
-	emails, _, err := ghClient.Users.ListEmails(ctx, &gogithub.ListOptions{PerPage: 100})
-	logger.ExternalCall(ctx, "github", "Users.ListEmails", start, err)
-	if err != nil {
-		return ""
 	}
 	var firstVerified string
 	for _, e := range emails {
@@ -421,6 +479,53 @@ func resolvePrimaryEmail(ctx context.Context, ghClient *gogithub.Client, profile
 		}
 	}
 	return firstVerified
+}
+
+// emailVerifiedOnGitHub reports whether target appears as a verified email on the
+// GitHub account described by emails. Comparison is case-insensitive.
+func emailVerifiedOnGitHub(emails []*gogithub.UserEmail, target string) bool {
+	for _, e := range emails {
+		if e.GetVerified() && strings.EqualFold(e.GetEmail(), target) {
+			return true
+		}
+	}
+	return false
+}
+
+// sendAcceptanceNotification emails the inviting admin to say their invitee has joined.
+// Looks up the admin's email from the users table and sends via the installation's
+// configured email channel. Runs as a fire-and-forget goroutine — errors are silently dropped.
+func (h *AuthHandler) sendAcceptanceNotification(ctx context.Context, invite *models.Invite, acceptorLogin string) {
+	var admin models.User
+	if h.db.WithContext(ctx).Where("login = ?", invite.InvitedBy).First(&admin).Error != nil || admin.Email == "" {
+		return
+	}
+
+	var cfgs []models.NotificationConfig
+	h.db.WithContext(ctx).Where("channel = ? AND enabled = true", "email").Find(&cfgs)
+	if len(cfgs) == 0 {
+		return
+	}
+
+	subject := fmt.Sprintf("%s accepted your invitation", acceptorLogin)
+	body := fmt.Sprintf(`<p><strong>%s</strong> accepted your invitation and joined as <strong>%s</strong>.</p>
+<table style="border-collapse:collapse">
+  <tr><td style="padding:4px 12px 4px 0">GitHub account:</td><td>%s</td></tr>
+  <tr><td style="padding:4px 12px 4px 0">Email used:</td><td>%s</td></tr>
+  <tr><td style="padding:4px 12px 4px 0">Accepted at:</td><td>%s UTC</td></tr>
+</table>
+<p><a href="%s/settings/team">View team →</a></p>`,
+		acceptorLogin, invite.Role, acceptorLogin, invite.Email,
+		time.Now().UTC().Format("2006-01-02 15:04"), h.frontendURL)
+
+	for _, cfg := range cfgs {
+		var ec notifications.EmailChannelConfig
+		if err := json.Unmarshal(cfg.Config, &ec); err != nil {
+			continue
+		}
+		smtpCfg, from := notifications.ResolveEmail(ec)
+		_ = notifications.SendEmail(ctx, smtpCfg, from, []string{admin.Email}, subject, body)
+	}
 }
 
 // Me returns the current user's profile and role.

@@ -17,6 +17,7 @@ import (
 	"github.com/Astraxx04/pr-reviewer/internal/ai"
 	"github.com/Astraxx04/pr-reviewer/internal/ai/rag"
 	"github.com/Astraxx04/pr-reviewer/internal/assignments"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"github.com/Astraxx04/pr-reviewer/internal/db/repo"
 	"github.com/Astraxx04/pr-reviewer/internal/events"
@@ -70,13 +71,13 @@ type ReviewWorker struct {
 	PRService     pr.Service
 	AIService     ai.Service
 	Aggregator    review.Aggregator
-	GHClient      gh.Client
+	TokenCache    *gh.InstallationTokenCache
 	DB            *gorm.DB
 	Log           *logger.Logger
 	Indexer       *rag.Indexer          // optional: indexes comments for RAG
 	NotifService  notifications.Service // optional: sends Slack/email/webhook notifications
 	EventHub      *events.Hub           // optional: publishes SSE events to connected clients
-	EncryptionKey string                // for decrypting integration credentials (e.g. Jira)
+	EncryptionKey string                // for decrypting credentials (GitHub App key, Jira, etc.)
 	FrontendURL   string                // base URL for commit-status target links
 }
 
@@ -98,7 +99,13 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 	)
 	start := time.Now()
 
-	prCtx, err := w.PRService.BuildContext(ctx, args.Owner, args.Repo, args.Number, args.Action)
+	instClient, err := db.ResolveInstallationClient(ctx, w.DB, w.EncryptionKey, w.TokenCache)
+	if err != nil {
+		w.Log.Error("failed to resolve GitHub installation client", "error", err)
+		return err
+	}
+
+	prCtx, err := w.PRService.BuildContext(ctx, args.Owner, args.Repo, args.Number, args.Action, instClient)
 	if err != nil {
 		w.Log.Error("failed to build PR context", "error", err)
 		return err
@@ -129,7 +136,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 
 	// Post a pending commit status up front so the PR shows the check is running.
 	if fullCfg.CommitStatus.Enabled {
-		w.postCommitStatus(ctx, args, prCtx.PR.Head.Sha, "pending", "AI review in progress…")
+		w.postCommitStatus(ctx, instClient, args, prCtx.PR.Head.Sha, "pending", "AI review in progress…")
 	}
 
 	// Auto-resolve stale bot comments on changed paths when PR is updated.
@@ -144,7 +151,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 			if !changedPaths[bc.Path] {
 				continue
 			}
-			if err := w.GHClient.PostReviewCommentReply(ctx, args.Owner, args.Repo, args.Number,
+			if err := instClient.PostReviewCommentReply(ctx, args.Owner, args.Repo, args.Number,
 				bc.GithubCommentID, "✅ This concern appears to have been addressed in the latest push."); err != nil {
 				w.Log.Error("failed to post stale-comment reply", "comment_id", bc.GithubCommentID, "error", err)
 			} else {
@@ -159,7 +166,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 
 	// Fetch .pr-reviewer-ignore and filter diff accordingly.
 	diff := prCtx.Diff
-	if ignoreContent, err := w.GHClient.GetFileContent(ctx, args.Owner, args.Repo, ".pr-reviewer-ignore"); err == nil {
+	if ignoreContent, err := instClient.GetFileContent(ctx, args.Owner, args.Repo, ".pr-reviewer-ignore"); err == nil {
 		var ignorePatterns []string
 		for _, line := range strings.Split(ignoreContent, "\n") {
 			line = strings.TrimSpace(line)
@@ -191,7 +198,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 
 	// Fetch and evaluate .pr-reviewer.yml custom rules.
 	var customViolations []string
-	if ruleCfg, err := rules.FetchAndParse(ctx, w.GHClient, args.Owner, args.Repo); err != nil {
+	if ruleCfg, err := rules.FetchAndParse(ctx, instClient, args.Owner, args.Repo); err != nil {
 		w.Log.Error("failed to parse .pr-reviewer.yml", "error", err)
 	} else if ruleCfg != nil {
 		customViolations = rules.Evaluate(ruleCfg, diff)
@@ -201,7 +208,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 	}
 
 	// Fetch PR template for template-awareness check.
-	prTemplate, _ := w.GHClient.GetFileContent(ctx, args.Owner, args.Repo, ".github/pull_request_template.md")
+	prTemplate, _ := instClient.GetFileContent(ctx, args.Owner, args.Repo, ".github/pull_request_template.md")
 
 	// Load false positive patterns: comment bodies that received 2+ thumbs-down votes.
 	var falsePositivePatterns []string
@@ -251,7 +258,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 		return err
 	}
 
-	ghReviewID, err := w.GHClient.PostReview(ctx, args.Owner, args.Repo, args.Number, &gh.ReviewSubmission{
+	ghReviewID, err := instClient.PostReview(ctx, args.Owner, args.Repo, args.Number, &gh.ReviewSubmission{
 		Body:     finalReview.Summary,
 		Event:    finalReview.Status,
 		Comments: finalReview.Comments,
@@ -269,7 +276,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 	w.Log.Info("review posted", "status", finalReview.Status, "comments", len(finalReview.Comments), "ms", latency)
 
 	// Post a human-readable summary comment with grouped P0–P3 findings.
-	if err := w.GHClient.PostSummaryComment(ctx, args.Owner, args.Repo, args.Number, &gh.ReviewSubmission{
+	if err := instClient.PostSummaryComment(ctx, args.Owner, args.Repo, args.Number, &gh.ReviewSubmission{
 		Body:     finalReview.Summary,
 		Event:    finalReview.Status,
 		Comments: finalReview.Comments,
@@ -286,7 +293,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 			state = "failure"
 			desc = fmt.Sprintf("Score %d/100 — below threshold of %d", result.Score, fullCfg.CommitStatus.MinScore)
 		}
-		w.postCommitStatus(ctx, args, prCtx.PR.Head.Sha, state, desc)
+		w.postCommitStatus(ctx, instClient, args, prCtx.PR.Head.Sha, state, desc)
 	}
 
 	// Persist to database (non-fatal).
@@ -307,7 +314,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 
 	// Track bot comment IDs so we can detect replies for conversational re-review.
 	if w.DB != nil && ghReviewID != 0 && reviewRow != nil {
-		if ghComments, err := w.GHClient.GetReviewCommentsByReview(ctx, args.Owner, args.Repo, args.Number, ghReviewID); err != nil {
+		if ghComments, err := instClient.GetReviewCommentsByReview(ctx, args.Owner, args.Repo, args.Number, ghReviewID); err != nil {
 			w.Log.Error("failed to fetch review comments for tracking", "error", err)
 		} else {
 			now := time.Now()
@@ -340,7 +347,7 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 			if f.Status == "removed" || f.Patch == "" {
 				continue
 			}
-			content, err := w.GHClient.GetFileContent(ctx, args.Owner, args.Repo, f.Filename)
+			content, err := instClient.GetFileContent(ctx, args.Owner, args.Repo, f.Filename)
 			if err != nil {
 				continue
 			}
@@ -352,14 +359,14 @@ func (w *ReviewWorker) Work(ctx context.Context, job *river.Job[ReviewJobArgs]) 
 
 	// Assign reviewers according to configured rules (non-fatal).
 	if dbRepo != nil {
-		if err := w.assign(ctx, args, prCtx, dbRepo, reviewRow, finalReview); err != nil {
+		if err := w.assign(ctx, instClient, args, prCtx, dbRepo, reviewRow, finalReview); err != nil {
 			w.Log.Error("assignment failed", "error", err)
 		}
 	}
 
 	// Apply auto-labels based on review score (non-fatal).
 	if fullCfg.AutoLabel {
-		if err := w.applyLabels(ctx, args, result.Score); err != nil {
+		if err := w.applyLabels(ctx, instClient, args, result.Score); err != nil {
 			w.Log.Error("auto-label failed", "error", err)
 		}
 	}
@@ -453,6 +460,7 @@ func (w *ReviewWorker) persist(
 
 func (w *ReviewWorker) assign(
 	ctx context.Context,
+	client gh.Client,
 	args ReviewJobArgs,
 	prCtx *pr.PRContext,
 	dbRepo *models.Repository,
@@ -464,13 +472,13 @@ func (w *ReviewWorker) assign(
 		return err
 	}
 
-	codeowners, _ := w.GHClient.GetCODEOWNERS(ctx, args.Owner, args.Repo)
+	codeowners, _ := client.GetCODEOWNERS(ctx, args.Owner, args.Repo)
 
 	seen := make(map[string]bool)
 	var allAssignees []string
 
 	for _, rule := range rules {
-		res, err := assignments.Evaluate(ctx, w.DB, &rule, prCtx, codeowners, dbRepo.InstallationID)
+		res, err := assignments.Evaluate(ctx, w.DB, &rule, prCtx, codeowners)
 		if err != nil {
 			w.Log.Error("evaluate assignment rule", "rule_id", rule.ID, "error", err)
 			continue
@@ -502,7 +510,7 @@ func (w *ReviewWorker) assign(
 	}
 
 	// Request reviewers on GitHub (best-effort, non-fatal).
-	if err := w.GHClient.RequestReviewers(ctx, args.Owner, args.Repo, args.Number, allAssignees); err != nil {
+	if err := client.RequestReviewers(ctx, args.Owner, args.Repo, args.Number, allAssignees); err != nil {
 		w.Log.Error("RequestReviewers failed", "error", err)
 	}
 
@@ -518,7 +526,7 @@ func (w *ReviewWorker) assign(
 }
 
 // applyLabels ensures the score-appropriate label exists and adds it to the PR.
-func (w *ReviewWorker) applyLabels(ctx context.Context, args ReviewJobArgs, score int) error {
+func (w *ReviewWorker) applyLabels(ctx context.Context, client gh.Client, args ReviewJobArgs, score int) error {
 	var labelName, color string
 	switch {
 	case score >= 80:
@@ -528,14 +536,14 @@ func (w *ReviewWorker) applyLabels(ctx context.Context, args ReviewJobArgs, scor
 	default:
 		labelName, color = "pr-reviewer: needs-changes", "d93f0b"
 	}
-	if err := w.GHClient.EnsureLabel(ctx, args.Owner, args.Repo, labelName, color, "Applied by pr-reviewer bot"); err != nil {
+	if err := client.EnsureLabel(ctx, args.Owner, args.Repo, labelName, color, "Applied by pr-reviewer bot"); err != nil {
 		return err
 	}
-	return w.GHClient.AddLabelsToIssue(ctx, args.Owner, args.Repo, args.Number, []string{labelName})
+	return client.AddLabelsToIssue(ctx, args.Owner, args.Repo, args.Number, []string{labelName})
 }
 
 // postCommitStatus posts a GitHub commit status for branch-protection use (non-fatal).
-func (w *ReviewWorker) postCommitStatus(ctx context.Context, args ReviewJobArgs, sha, state, desc string) {
+func (w *ReviewWorker) postCommitStatus(ctx context.Context, client gh.Client, args ReviewJobArgs, sha, state, desc string) {
 	if sha == "" {
 		return
 	}
@@ -543,7 +551,7 @@ func (w *ReviewWorker) postCommitStatus(ctx context.Context, args ReviewJobArgs,
 	if w.FrontendURL != "" {
 		targetURL = fmt.Sprintf("%s/prs/%s/%s/%d", strings.TrimRight(w.FrontendURL, "/"), args.Owner, args.Repo, args.Number)
 	}
-	if err := w.GHClient.CreateStatus(ctx, args.Owner, args.Repo, sha, &gh.CommitStatus{
+	if err := client.CreateStatus(ctx, args.Owner, args.Repo, sha, &gh.CommitStatus{
 		State:       state,
 		Description: desc,
 		Context:     commitStatusContext,

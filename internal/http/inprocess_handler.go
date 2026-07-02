@@ -97,7 +97,7 @@ func (h *InProcessWebhookHandler) Handle(w http.ResponseWriter, r *http.Request)
 
 	go func() {
 		ctx := context.Background()
-		prCtx, err := h.prService.BuildContext(ctx, owner, repoName, number, event.Action)
+		prCtx, err := h.prService.BuildContext(ctx, owner, repoName, number, event.Action, h.ghClient)
 		if err != nil {
 			h.log.Error("failed to build PR context", "error", err)
 			return

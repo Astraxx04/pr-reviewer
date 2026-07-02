@@ -16,9 +16,14 @@ import (
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 )
 
-type APITokenHandler struct{ db *gorm.DB }
+type APITokenHandler struct {
+	db      *gorm.DB
+	maxDays int // 0 = no limit; from API_TOKEN_MAX_DAYS config
+}
 
-func NewAPITokenHandler(db *gorm.DB) *APITokenHandler { return &APITokenHandler{db: db} }
+func NewAPITokenHandler(db *gorm.DB, maxDays int) *APITokenHandler {
+	return &APITokenHandler{db: db, maxDays: maxDays}
+}
 
 func (h *APITokenHandler) List(w http.ResponseWriter, r *http.Request) {
 	user := getUser(r)
@@ -59,6 +64,18 @@ func (h *APITokenHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid expiry: "+err.Error())
 		return
+	}
+
+	// Enforce the installation-wide maximum token lifetime.
+	if h.maxDays > 0 {
+		ceiling := time.Now().AddDate(0, 0, h.maxDays)
+		if expiresAt == nil {
+			expiresAt = &ceiling
+		} else if expiresAt.After(ceiling) {
+			writeError(w, http.StatusBadRequest,
+				fmt.Sprintf("token lifetime exceeds the maximum of %d days", h.maxDays))
+			return
+		}
 	}
 
 	// Generate a 32-byte cryptographically random token.

@@ -24,7 +24,7 @@ const secret = "test-secret"
 
 type mockPRService struct{}
 
-func (m *mockPRService) BuildContext(_ context.Context, owner, repo string, number int, action string) (*pr.PRContext, error) {
+func (m *mockPRService) BuildContext(_ context.Context, owner, repo string, number int, action string, _ gh.Client) (*pr.PRContext, error) {
 	return &pr.PRContext{Repo: owner + "/" + repo, Number: number, Title: "Test PR", Action: action}, nil
 }
 

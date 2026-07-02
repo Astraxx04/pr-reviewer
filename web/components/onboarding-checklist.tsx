@@ -41,7 +41,7 @@ export function OnboardingChecklist({ token }: { token: string }) {
       const ghDone = ghApp.status === "fulfilled" && ghApp.value.configured;
       const providerDone = providers.status === "fulfilled" && providers.value.length > 0;
       const repoDone = repos.status === "fulfilled" && repos.value.some((r) => r.Enabled);
-      const teamDone = team.status === "fulfilled" && team.value.length > 0;
+      const teamDone = team.status === "fulfilled" && team.value.length > 1;
       const notifDone = notifs.status === "fulfilled" && notifs.value.length > 0;
 
       setItems([
@@ -68,11 +68,11 @@ export function OnboardingChecklist({ token }: { token: string }) {
 
   return (
     <Card className="border-primary/20 bg-primary/5">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-xl flex items-center gap-3">
             Getting started
-            <span className="text-xs font-normal text-muted-foreground">
+            <span className="text-base font-normal text-muted-foreground">
               {doneCount}/{items.length} complete
             </span>
           </CardTitle>
@@ -80,34 +80,34 @@ export function OnboardingChecklist({ token }: { token: string }) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground"
+              className="h-8 w-8 text-muted-foreground"
               onClick={() => setCollapsed((c) => !c)}
               aria-label={collapsed ? "Expand checklist" : "Collapse checklist"}
               aria-expanded={!collapsed}
             >
-              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              {collapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground"
+              className="h-8 w-8 text-muted-foreground"
               onClick={dismiss}
               aria-label="Dismiss onboarding checklist"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </CardHeader>
       {!collapsed && (
         <CardContent>
-          <ul className="space-y-2" role="list" aria-label="Setup steps">
+          <ul className="space-y-3" role="list" aria-label="Setup steps">
             {items.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 text-sm">
+              <li key={item.id} className="flex items-center gap-3 text-base">
                 {item.done ? (
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-500" aria-hidden="true" />
+                  <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-500" aria-hidden="true" />
                 ) : (
-                  <Circle className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <Circle className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
                 )}
                 {item.done ? (
                   <span className="line-through text-muted-foreground">{item.label}</span>

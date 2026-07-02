@@ -87,14 +87,9 @@ func (s *notifService) loadConfigs(ctx context.Context, repoID uint) []models.No
 	if repoID == 0 {
 		return nil
 	}
-	var r models.Repository
-	if s.db.WithContext(ctx).First(&r, repoID).Error != nil {
-		return nil
-	}
 	var cfgs []models.NotificationConfig
 	s.db.WithContext(ctx).
-		Where("installation_id = ? AND enabled = true AND (repo_id IS NULL OR repo_id = ?)",
-			r.InstallationID, repoID).
+		Where("enabled = true AND (repo_id IS NULL OR repo_id = ?)", repoID).
 		Order("repo_id ASC NULLS FIRST").
 		Find(&cfgs)
 	return cfgs

@@ -9,7 +9,9 @@ import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { listPRs, type PRSummary, type PRStatus } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GitPullRequest } from "lucide-react";
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "All", value: "" },
@@ -80,14 +82,15 @@ export default function PRsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Pull Requests</h1>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Pull Requests</h1>
+      </div>
 
       <div className="flex gap-2 flex-wrap" role="group" aria-label="Filter by status">
         {STATUS_FILTERS.map((f) => (
           <Button
             key={f.value}
-            size="sm"
             variant={status === f.value ? "default" : "outline"}
             onClick={() => { setStatus(f.value); setPage(1); }}
             aria-pressed={status === f.value}
@@ -100,18 +103,26 @@ export default function PRsPage() {
       {loading ? (
         <Skeleton className="h-64 w-full" aria-label="Loading pull requests" />
       ) : prs.length === 0 ? (
-        <p className="text-muted-foreground" role="status">No pull requests found.</p>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <GitPullRequest className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="text-base font-medium text-foreground">No pull requests found.</p>
+            <p className="text-base mt-1">
+              {status ? "Try a different filter, or wait for a PR to be opened." : "Pull requests will appear here once the bot reviews them."}
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm" aria-label="Pull requests list">
+          <table className="w-full text-base" aria-label="Pull requests list">
             <thead className="border-b bg-muted/50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium" scope="col">Pull Request</th>
-                <th className="px-4 py-3 text-left font-medium" scope="col">Repo</th>
-                <th className="px-4 py-3 text-left font-medium" scope="col">Status</th>
-                <th className="px-4 py-3 text-left font-medium" scope="col">Score</th>
-                <th className="px-4 py-3 text-left font-medium" scope="col">Reviews</th>
-                <th className="px-4 py-3 text-left font-medium" scope="col">Last Review</th>
+                <th className="px-5 py-3.5 text-left font-medium" scope="col">Pull Request</th>
+                <th className="px-5 py-3.5 text-left font-medium" scope="col">Repo</th>
+                <th className="px-5 py-3.5 text-left font-medium" scope="col">Status</th>
+                <th className="px-5 py-3.5 text-left font-medium" scope="col">Score</th>
+                <th className="px-5 py-3.5 text-left font-medium" scope="col">Reviews</th>
+                <th className="px-5 py-3.5 text-left font-medium" scope="col">Last Review</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -130,7 +141,7 @@ export default function PRsPage() {
                     onClick={() => router.push(href)}
                     aria-label={`${pr.title || `PR #${pr.number}`} — ${prStatusLabel(pr.pr_status)}, score ${pr.review_count > 0 ? `${pr.current_score}/100` : "not reviewed"}`}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <Link
                         href={href}
                         className="font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring rounded-sm"
@@ -139,17 +150,17 @@ export default function PRsPage() {
                       >
                         {pr.title || `PR #${pr.number}`}
                       </Link>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-sm text-muted-foreground mt-0.5">
                         #{pr.number} · {pr.author}
                       </p>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{pr.repo}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4 font-mono text-sm text-muted-foreground">{pr.repo}</td>
+                    <td className="px-5 py-4">
                       <Badge variant={prStatusVariant(pr.pr_status)}>
                         {prStatusLabel(pr.pr_status)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       {pr.review_count > 0 ? (
                         <span className={`font-mono font-semibold ${scoreColor(pr.current_score)}`}>
                           {pr.current_score}/100
@@ -158,8 +169,8 @@ export default function PRsPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{pr.review_count}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
+                    <td className="px-5 py-4 text-muted-foreground">{pr.review_count}</td>
+                    <td className="px-5 py-4 text-muted-foreground text-sm">
                       <time dateTime={pr.last_reviewed_at ?? undefined}>{timeAgo(pr.last_reviewed_at)}</time>
                     </td>
                   </tr>
@@ -171,10 +182,9 @@ export default function PRsPage() {
       )}
 
       {totalPages > 1 && (
-        <nav className="flex gap-2" aria-label="Pagination">
+        <nav className="flex items-center gap-2" aria-label="Pagination">
           <Button
             variant="outline"
-            size="sm"
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
             aria-label="Previous page"
@@ -186,7 +196,6 @@ export default function PRsPage() {
           </span>
           <Button
             variant="outline"
-            size="sm"
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
             aria-label="Next page"

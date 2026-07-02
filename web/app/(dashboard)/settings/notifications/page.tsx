@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToken } from "@/hooks/useToken";
 import {
   listNotificationConfigs,
@@ -24,21 +25,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Bell, Plus, Trash2, FlaskConical, Hash, Mail, Webhook } from "lucide-react";
+import { Bell, Plus, Trash2, FlaskConical, Hash, Mail, Webhook, Zap, CalendarDays, Calendar } from "lucide-react";
 
 const ALL_EVENTS = ["assignment", "review_complete", "re_review", "score_below_threshold"];
 const EVENT_LABELS: Record<string, string> = {
@@ -49,9 +44,9 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 function channelIcon(channel: NotificationChannel) {
-  if (channel === "slack") return <Hash className="h-4 w-4" />;
-  if (channel === "email") return <Mail className="h-4 w-4" />;
-  return <Webhook className="h-4 w-4" />;
+  if (channel === "slack") return <Hash className="h-5 w-5" />;
+  if (channel === "email") return <Mail className="h-5 w-5" />;
+  return <Webhook className="h-5 w-5" />;
 }
 
 function defaultConfig(channel: NotificationChannel): SlackConfig | EmailConfig | WebhookConfig {
@@ -83,9 +78,9 @@ function SlackForm({
   onChange: (v: SlackConfig) => void;
 }) {
   return (
-    <div className="space-y-3">
-      <div>
-        <Label>Webhook URL</Label>
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label className="text-sm">Webhook URL</Label>
         <Input
           placeholder="https://hooks.slack.com/services/..."
           value={value.webhook_url}
@@ -96,10 +91,12 @@ function SlackForm({
         events={value.events}
         onChange={(events) => onChange({ ...value, events })}
       />
-      <ScoreThresholdField
-        value={value.score_threshold}
-        onChange={(score_threshold) => onChange({ ...value, score_threshold })}
-      />
+      {value.events.includes("score_below_threshold") && (
+        <ScoreThresholdField
+          value={value.score_threshold}
+          onChange={(score_threshold) => onChange({ ...value, score_threshold })}
+        />
+      )}
       <TemplateField value={value.template} onChange={(t) => onChange({ ...value, template: t })} />
     </div>
   );
@@ -115,9 +112,9 @@ function EmailForm({
 }) {
   const [toInput, setToInput] = useState(value.to?.join(", ") ?? "");
   return (
-    <div className="space-y-3">
-      <div>
-        <Label>
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label className="text-sm">
           Additional recipients{" "}
           <span className="text-xs text-muted-foreground font-normal">(optional, comma-separated)</span>
         </Label>
@@ -132,14 +129,14 @@ function EmailForm({
             });
           }}
         />
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground">
           Assignment emails are sent to the assignee automatically (using their GitHub email).
           Add addresses here for extra recipients, or for review-complete / digest events that
           aren&apos;t tied to a specific person.
         </p>
       </div>
-      <div>
-        <Label>From address</Label>
+      <div className="space-y-1.5">
+        <Label className="text-sm">From address</Label>
         <Input
           placeholder="pr-reviewer@yourcompany.com"
           value={value.from ?? ""}
@@ -151,16 +148,16 @@ function EmailForm({
           SMTP server — host, port and from address are required.
         </p>
         <div className="grid grid-cols-3 gap-2">
-          <div className="col-span-2">
-            <Label>SMTP host</Label>
+          <div className="col-span-2 space-y-1.5">
+            <Label className="text-sm">SMTP host</Label>
             <Input
               placeholder="smtp.gmail.com"
               value={value.smtp_host ?? ""}
               onChange={(e) => onChange({ ...value, smtp_host: e.target.value })}
             />
           </div>
-          <div>
-            <Label>Port</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Port</Label>
             <Input
               type="number"
               placeholder="587"
@@ -171,16 +168,16 @@ function EmailForm({
             />
           </div>
         </div>
-        <div>
-          <Label>Username</Label>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Username</Label>
           <Input
             placeholder="apikey / you@gmail.com"
             value={value.smtp_username ?? ""}
             onChange={(e) => onChange({ ...value, smtp_username: e.target.value })}
           />
         </div>
-        <div>
-          <Label>Password</Label>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Password</Label>
           <Input
             type="password"
             placeholder={value.smtp_password_set ? "•••••••• (leave blank to keep stored password)" : "SMTP password or app password"}
@@ -188,7 +185,7 @@ function EmailForm({
             onChange={(e) => onChange({ ...value, smtp_password: e.target.value })}
           />
           {value.smtp_password_set && (
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               A password is stored (encrypted). Leave blank to keep it, or type a new one to replace it.
             </p>
           )}
@@ -202,28 +199,39 @@ function EmailForm({
         events={value.events}
         onChange={(events) => onChange({ ...value, events })}
       />
-      <ScoreThresholdField
-        value={value.score_threshold}
-        onChange={(score_threshold) => onChange({ ...value, score_threshold })}
-      />
-      <div>
-        <Label>Digest</Label>
-        <Select
-          value={value.digest ?? "none"}
-          onValueChange={(v) => onChange({ ...value, digest: v as EmailConfig["digest"] })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">None — email on each event</SelectItem>
-            <SelectItem value="daily">Daily digest</SelectItem>
-            <SelectItem value="weekly">Weekly digest</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground mt-1">
-          A digest sends one summary email per period instead of (or in addition to) per-event alerts.
-        </p>
+      {value.events.includes("score_below_threshold") && (
+        <ScoreThresholdField
+          value={value.score_threshold}
+          onChange={(score_threshold) => onChange({ ...value, score_threshold })}
+        />
+      )}
+      <div className="space-y-1.5">
+        <Label className="text-sm">Digest</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { id: "none",   icon: <Zap className="h-5 w-5" />,         label: "None",   desc: "Email per event" },
+            { id: "daily",  icon: <CalendarDays className="h-5 w-5" />, label: "Daily",  desc: "One summary a day" },
+            { id: "weekly", icon: <Calendar className="h-5 w-5" />,     label: "Weekly", desc: "One summary a week" },
+          ] as const).map((opt) => {
+            const selected = (value.digest ?? "none") === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onChange({ ...value, digest: opt.id })}
+                className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors cursor-pointer ${
+                  selected
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground"
+                }`}
+              >
+                {opt.icon}
+                <span className="text-sm font-medium">{opt.label}</span>
+                <span className="text-xs">{opt.desc}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       <TemplateField value={value.template} onChange={(t) => onChange({ ...value, template: t })} />
     </div>
@@ -239,17 +247,17 @@ function WebhookForm({
   onChange: (v: WebhookConfig) => void;
 }) {
   return (
-    <div className="space-y-3">
-      <div>
-        <Label>Endpoint URL</Label>
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label className="text-sm">Endpoint URL</Label>
         <Input
           placeholder="https://your-service.com/hooks/pr-reviewer"
           value={value.url}
           onChange={(e) => onChange({ ...value, url: e.target.value })}
         />
       </div>
-      <div>
-        <Label>Secret (for HMAC-SHA256 signing — optional)</Label>
+      <div className="space-y-1.5">
+        <Label className="text-sm">Secret (for HMAC-SHA256 signing — optional)</Label>
         <Input
           type="password"
           placeholder={value.secret_set ? "•••••••• (leave blank to keep stored secret)" : "your-webhook-secret"}
@@ -257,7 +265,7 @@ function WebhookForm({
           onChange={(e) => onChange({ ...value, secret: e.target.value })}
         />
         {value.secret_set && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground">
             A secret is stored (encrypted). Leave blank to keep it, or type a new one to replace it.
           </p>
         )}
@@ -266,10 +274,12 @@ function WebhookForm({
         events={value.events}
         onChange={(events) => onChange({ ...value, events })}
       />
-      <ScoreThresholdField
-        value={value.score_threshold}
-        onChange={(score_threshold) => onChange({ ...value, score_threshold })}
-      />
+      {value.events.includes("score_below_threshold") && (
+        <ScoreThresholdField
+          value={value.score_threshold}
+          onChange={(score_threshold) => onChange({ ...value, score_threshold })}
+        />
+      )}
     </div>
   );
 }
@@ -284,8 +294,8 @@ function ScoreThresholdField({
   onChange: (v: number) => void;
 }) {
   return (
-    <div>
-      <Label>Score threshold</Label>
+    <div className="space-y-1.5">
+      <Label className="text-sm">Score threshold</Label>
       <Input
         type="number"
         min={0}
@@ -293,7 +303,7 @@ function ScoreThresholdField({
         value={value ?? 0}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <p className="text-xs text-muted-foreground mt-1">
+      <p className="text-xs text-muted-foreground">
         Fires the &ldquo;Score below threshold&rdquo; event when a review scores below this value (0 = disabled).
       </p>
     </div>
@@ -308,21 +318,26 @@ function EventCheckboxes({
   onChange: (events: string[]) => void;
 }) {
   return (
-    <div>
-      <Label className="mb-1 block">Events</Label>
-      <div className="flex flex-wrap gap-3">
-        {ALL_EVENTS.map((e) => (
-          <label key={e} className="flex items-center gap-1.5 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={events.includes(e)}
-              onChange={(ev) =>
-                onChange(ev.target.checked ? [...events, e] : events.filter((x) => x !== e))
-              }
-            />
-            {EVENT_LABELS[e]}
-          </label>
-        ))}
+    <div className="space-y-1.5">
+      <Label className="text-sm">Events</Label>
+      <div className="flex flex-wrap gap-2">
+        {ALL_EVENTS.map((e) => {
+          const selected = events.includes(e);
+          return (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onChange(selected ? events.filter((x) => x !== e) : [...events, e])}
+              className={`rounded-full px-3 py-1 text-sm border transition-colors cursor-pointer ${
+                selected
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
+              }`}
+            >
+              {EVENT_LABELS[e]}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -336,26 +351,28 @@ function TemplateField({
   onChange: (v: string) => void;
 }) {
   return (
-    <div>
-      <Label>
-        Message template{" "}
-        <span className="text-xs text-muted-foreground font-normal">
-          (optional — uses default if blank)
-        </span>
-      </Label>
-      <Textarea
-        rows={3}
-        placeholder="Use {{pr.title}}, {{pr.url}}, {{assignee}}, {{review.score}}, {{review.summary}}"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="font-mono text-xs"
-      />
-    </div>
+    <details className="group">
+      <summary className="flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground select-none list-none">
+        <span className="transition-transform group-open:rotate-90">▶</span>
+        Advanced — custom message template
+      </summary>
+      <div className="mt-2 space-y-1.5">
+        <Textarea
+          rows={3}
+          placeholder="Use {{pr.title}}, {{pr.url}}, {{assignee}}, {{review.score}}, {{review.summary}}"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="font-mono text-xs"
+        />
+        <p className="text-xs text-muted-foreground">Leave blank to use the default template.</p>
+      </div>
+    </details>
   );
 }
 
 export default function NotificationsPage() {
   const { token } = useToken();
+  const router = useRouter();
   const [configs, setConfigs] = useState<NotificationConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -367,6 +384,7 @@ export default function NotificationsPage() {
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -428,11 +446,12 @@ export default function NotificationsPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!token) return;
+  async function handleDelete() {
+    if (!token || confirmDeleteId == null) return;
     try {
-      await deleteNotificationConfig(token, id);
-      setConfigs((cs) => cs.filter((c) => c.ID !== id));
+      await deleteNotificationConfig(token, confirmDeleteId);
+      setConfigs((cs) => cs.filter((c) => c.ID !== confirmDeleteId));
+      setConfirmDeleteId(null);
       toast.success("Deleted");
     } catch {
       toast.error("Delete failed");
@@ -477,20 +496,21 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Notifications</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+          <h1 className="text-3xl font-bold">Notifications</h1>
+          <p className="text-muted-foreground text-base mt-1">
             Configure Slack, email, and webhook alerts for review events.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleTriggerDigest}>
+          <Button variant="outline" size="lg" onClick={handleTriggerDigest}>
             Send digest now
           </Button>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button size="lg" onClick={openCreate}>
+            <Plus className="h-5 w-5 mr-2" />
             Add channel
           </Button>
         </div>
@@ -505,9 +525,9 @@ export default function NotificationsPage() {
       ) : configs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <Bell className="h-8 w-8 mx-auto mb-3 opacity-30" />
-            <p>No notification channels configured yet.</p>
-            <p className="text-sm mt-1">
+            <Bell className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="text-base font-medium text-foreground">No notification channels configured yet.</p>
+            <p className="text-base mt-1">
               Add a Slack webhook, email recipients, or an outbound webhook to get started.
             </p>
           </CardContent>
@@ -520,7 +540,7 @@ export default function NotificationsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {channelIcon(cfg.Channel)}
-                    <CardTitle className="text-base capitalize">{cfg.Channel}</CardTitle>
+                    <CardTitle className="text-lg capitalize">{cfg.Channel}</CardTitle>
                     <Badge variant={cfg.Enabled ? "default" : "secondary"}>
                       {cfg.Enabled ? "Enabled" : "Disabled"}
                     </Badge>
@@ -529,6 +549,7 @@ export default function NotificationsPage() {
                     <Switch
                       checked={cfg.Enabled}
                       onCheckedChange={() => handleToggle(cfg)}
+                      className="cursor-pointer"
                     />
                     <Button
                       size="sm"
@@ -536,7 +557,7 @@ export default function NotificationsPage() {
                       onClick={() => handleTest(cfg.ID)}
                       disabled={testing === cfg.ID}
                     >
-                      <FlaskConical className="h-3 w-3 mr-1" />
+                      <FlaskConical className="h-4 w-4 mr-1" />
                       {testing === cfg.ID ? "Testing…" : "Test"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => openEdit(cfg)}>
@@ -546,7 +567,7 @@ export default function NotificationsPage() {
                       size="sm"
                       variant="ghost"
                       className="text-destructive"
-                      onClick={() => handleDelete(cfg.ID)}
+                      onClick={() => setConfirmDeleteId(cfg.ID)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -554,7 +575,7 @@ export default function NotificationsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground truncate">{configSummary(cfg)}</p>
+                <p className="text-base text-muted-foreground truncate">{configSummary(cfg)}</p>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {((cfg.Config as unknown as Record<string, unknown>).events as string[] | undefined)?.map((e) => (
                     <Badge key={e} variant="outline" className="text-xs">
@@ -569,34 +590,44 @@ export default function NotificationsPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-xl">
               {editTarget ? "Edit notification channel" : "Add notification channel"}
             </DialogTitle>
+            <DialogDescription>
+              {editTarget
+                ? "Update the configuration for this notification channel."
+                : "Choose a channel type and configure where to send review event alerts."}
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="overflow-y-auto max-h-[60vh] space-y-5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {!editTarget && (
-              <div>
-                <Label>Channel type</Label>
-                <Select
-                  value={channel}
-                  onValueChange={(v) => {
-                    const ch = v as NotificationChannel;
-                    setChannel(ch);
-                    setChannelConfig(defaultConfig(ch));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="slack">Slack</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="webhook">Outbound webhook</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Channel type</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: "slack",   icon: <Hash className="h-5 w-5" />,    label: "Slack",   desc: "Post to a channel" },
+                    { id: "email",   icon: <Mail className="h-5 w-5" />,    label: "Email",   desc: "Send via SMTP" },
+                    { id: "webhook", icon: <Webhook className="h-5 w-5" />, label: "Webhook", desc: "HTTP POST payload" },
+                  ] as const).map((ch) => (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      onClick={() => { setChannel(ch.id); setChannelConfig(defaultConfig(ch.id)); }}
+                      className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors cursor-pointer ${
+                        channel === ch.id
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      {ch.icon}
+                      <span className="text-sm font-medium">{ch.label}</span>
+                      <span className="text-xs">{ch.desc}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -619,19 +650,38 @@ export default function NotificationsPage() {
               />
             )}
 
-            <div className="flex items-center gap-2">
-              <Switch checked={enabled} onCheckedChange={setEnabled} />
-              <Label>Enabled</Label>
+            <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Enabled</p>
+                <p className="text-sm text-muted-foreground">Send notifications for this channel</p>
+              </div>
+              <Switch checked={enabled} onCheckedChange={setEnabled} className="cursor-pointer" />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="ghost" size="lg" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button size="lg" onClick={handleSave} disabled={saving}>
               {saving ? "Saving…" : "Save"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDeleteId != null} onOpenChange={(o) => { if (!o) setConfirmDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Remove channel?</DialogTitle>
+            <DialogDescription className="text-base">
+              <strong className="capitalize">{configs.find((c) => c.ID === confirmDeleteId)?.Channel || "This channel"}</strong> will
+              be permanently removed and will stop sending notifications.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="lg" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" size="lg" onClick={handleDelete}>Remove</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

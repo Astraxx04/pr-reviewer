@@ -13,20 +13,19 @@ import (
 
 // this defines the interface for PR operations.
 type Service interface {
-	BuildContext(ctx context.Context, owner, repo string, number int, action string) (*PRContext, error)
+	BuildContext(ctx context.Context, owner, repo string, number int, action string, client gh.Client) (*PRContext, error)
 }
 
 // this is the implementation of the Service interface.
 type serviceImpl struct {
-	ghClient gh.Client
-	log      *logger.Logger
+	log *logger.Logger
 }
 
-func NewService(ghClient gh.Client, log *logger.Logger) Service {
-	return &serviceImpl{ghClient: ghClient, log: log}
+func NewService(log *logger.Logger) Service {
+	return &serviceImpl{log: log}
 }
 
-func (s *serviceImpl) BuildContext(ctx context.Context, owner, repo string, number int, action string) (*PRContext, error) {
+func (s *serviceImpl) BuildContext(ctx context.Context, owner, repo string, number int, action string, client gh.Client) (*PRContext, error) {
 	ctx, span := telemetry.Tracer().Start(ctx, "pr.build_context")
 	defer span.End()
 	span.SetAttributes(
@@ -36,12 +35,12 @@ func (s *serviceImpl) BuildContext(ctx context.Context, owner, repo string, numb
 	)
 	s.log.Info("Building PR context", "owner", owner, "repo", repo, "number", number)
 
-	pr, err := s.ghClient.GetPullRequest(ctx, owner, repo, number)
+	pr, err := client.GetPullRequest(ctx, owner, repo, number)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PR: %w", err)
 	}
 
-	diff, err := s.ghClient.GetPullRequestDiff(ctx, owner, repo, number)
+	diff, err := client.GetPullRequestDiff(ctx, owner, repo, number)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get diff: %w", err)
 	}

@@ -74,6 +74,11 @@ func LatestMigrationVersion() (uint, error) {
 
 // RunMigrations applies all pending application migrations. It is a no-op when
 // the schema is already current. River migrations are handled separately.
+//
+// Dirty-state recovery: if a previous run was interrupted mid-migration, the
+// schema_migrations table records the version as dirty. All our migrations are
+// idempotent (they use IF EXISTS / IF NOT EXISTS guards), so we can safely
+// step back one version and retry rather than requiring manual intervention.
 func RunMigrations(dsn string) error {
 	sqlDB, err := openSQL(dsn)
 	if err != nil {
@@ -86,7 +91,21 @@ func RunMigrations(dsn string) error {
 	}
 	defer func() { _, _ = m.Close() }()
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	if err := m.Up(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			return nil
+		}
+		var dirtyErr migrate.ErrDirty
+		if errors.As(err, &dirtyErr) && dirtyErr.Version > 0 {
+			// Step back one version so Up() re-runs the dirty migration.
+			if forceErr := m.Force(int(dirtyErr.Version) - 1); forceErr != nil {
+				return fmt.Errorf("db: dirty recovery force: %w", forceErr)
+			}
+			if retryErr := m.Up(); retryErr != nil && !errors.Is(retryErr, migrate.ErrNoChange) {
+				return fmt.Errorf("db: apply migrations after dirty recovery: %w", retryErr)
+			}
+			return nil
+		}
 		return fmt.Errorf("db: apply migrations: %w", err)
 	}
 	return nil

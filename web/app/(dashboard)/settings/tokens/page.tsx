@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToken } from "@/hooks/useToken";
 import {
   listAPITokens,
@@ -10,6 +11,7 @@ import {
   type CreatedAPIToken,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -17,22 +19,30 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Copy, KeyRound } from "lucide-react";
+import { Plus, Trash2, Copy, KeyRound, Eye, Pencil } from "lucide-react";
+
+const EXPIRY_PRESETS = [
+  { label: "30 days", days: 30 },
+  { label: "90 days", days: 90 },
+  { label: "1 year",  days: 365 },
+  { label: "No expiry", days: 0 },
+] as const;
+
+function addDays(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function APITokensPage() {
   const { token } = useToken();
+  const router = useRouter();
   const [tokens, setTokens] = useState<APIToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -41,7 +51,8 @@ export default function APITokensPage() {
   const [expiresAt, setExpiresAt] = useState("");
   const [saving, setSaving] = useState(false);
   const [newToken, setNewToken] = useState<CreatedAPIToken | null>(null);
-  const [revoking, setRevoking] = useState<number | null>(null);
+  const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -73,17 +84,18 @@ export default function APITokensPage() {
     }
   }
 
-  async function handleRevoke(id: number) {
-    if (!token) return;
-    setRevoking(id);
+  async function handleRevoke() {
+    if (!token || confirmRevokeId == null) return;
+    setRevoking(true);
     try {
-      await revokeAPIToken(token, id);
-      setTokens((ts) => ts.filter((t) => t.ID !== id));
+      await revokeAPIToken(token, confirmRevokeId);
+      setTokens((ts) => ts.filter((t) => t.ID !== confirmRevokeId));
+      setConfirmRevokeId(null);
       toast.success("Token revoked");
     } catch {
       toast.error("Revoke failed");
     } finally {
-      setRevoking(null);
+      setRevoking(false);
     }
   }
 
@@ -92,16 +104,17 @@ export default function APITokensPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">API Tokens</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+          <h1 className="text-3xl font-bold">API Tokens</h1>
+          <p className="text-base text-muted-foreground mt-1">
             Generate long-lived tokens for CLI and automation. Raw values are shown once.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button size="lg" onClick={() => setCreateOpen(true)}>
+          <Plus className="h-5 w-5 mr-2" />
           Generate token
         </Button>
       </div>
@@ -111,51 +124,52 @@ export default function APITokensPage() {
           {[0, 1].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
         </div>
       ) : tokens.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground border rounded-md">
-          <KeyRound className="h-8 w-8 mx-auto mb-3 opacity-30" />
-          <p>No API tokens yet.</p>
-          <p className="text-sm mt-1">Generate a token to use with the CLI or external integrations.</p>
-        </div>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <KeyRound className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="text-base font-medium text-foreground">No API tokens yet.</p>
+            <p className="text-base mt-1">Generate a token to use with the CLI or external integrations.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="rounded-md border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+        <div className="rounded-lg border">
+          <table className="w-full text-base">
+            <thead className="border-b bg-muted/50">
               <tr>
-                <th scope="col" className="px-4 py-2 text-left font-medium">Name</th>
-                <th scope="col" className="px-4 py-2 text-left font-medium">Scope</th>
-                <th scope="col" className="px-4 py-2 text-left font-medium">Prefix</th>
-                <th scope="col" className="px-4 py-2 text-left font-medium">Last used</th>
-                <th scope="col" className="px-4 py-2 text-left font-medium">Expires</th>
-                <th scope="col" className="px-4 py-2 text-left font-medium">Created</th>
-                <th scope="col" className="px-4 py-2"></th>
+                <th scope="col" className="px-5 py-3.5 text-left font-medium">Name</th>
+                <th scope="col" className="px-5 py-3.5 text-left font-medium">Scope</th>
+                <th scope="col" className="px-5 py-3.5 text-left font-medium">Prefix</th>
+                <th scope="col" className="px-5 py-3.5 text-left font-medium">Last used</th>
+                <th scope="col" className="px-5 py-3.5 text-left font-medium">Expires</th>
+                <th scope="col" className="px-5 py-3.5 text-left font-medium">Created</th>
+                <th scope="col" className="px-5 py-3.5"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y">
               {tokens.map((t) => (
-                <tr key={t.ID} className="border-t hover:bg-muted/30">
-                  <td className="px-4 py-2 font-medium">{t.Name}</td>
-                  <td className="px-4 py-2">
+                <tr key={t.ID} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-5 py-4 font-medium">{t.Name}</td>
+                  <td className="px-5 py-4">
                     <Badge variant={t.Scope === "readwrite" ? "default" : "secondary"} className="text-xs">
                       {t.Scope}
                     </Badge>
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{t.Prefix}…</td>
-                  <td className="px-4 py-2 text-muted-foreground text-xs">
+                  <td className="px-5 py-4 font-mono text-sm text-muted-foreground">{t.Prefix}…</td>
+                  <td className="px-5 py-4 text-muted-foreground text-sm">
                     {t.LastUsedAt ? new Date(t.LastUsedAt).toLocaleDateString() : "Never"}
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground text-xs">
+                  <td className="px-5 py-4 text-muted-foreground text-sm">
                     {t.ExpiresAt ? new Date(t.ExpiresAt).toLocaleDateString() : "Never"}
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground text-xs">
+                  <td className="px-5 py-4 text-muted-foreground text-sm">
                     <time dateTime={t.CreatedAt}>{new Date(t.CreatedAt).toLocaleDateString()}</time>
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-5 py-4 text-right">
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-destructive"
-                      onClick={() => handleRevoke(t.ID)}
-                      disabled={revoking === t.ID}
+                      className="text-destructive cursor-pointer"
+                      onClick={() => setConfirmRevokeId(t.ID)}
                       aria-label={`Revoke token ${t.Name}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -170,13 +184,14 @@ export default function APITokensPage() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Generate API token</DialogTitle>
+            <DialogTitle className="text-xl">Generate API token</DialogTitle>
+            <DialogDescription>Create a token for CLI access or external integrations.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>Token name</Label>
+          <div className="space-y-5 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Token name</Label>
               <Input
                 placeholder="e.g. CI pipeline, local dev"
                 value={name}
@@ -184,23 +199,59 @@ export default function APITokensPage() {
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
             </div>
-            <div>
-              <Label>Scope</Label>
-              <Select value={scope} onValueChange={(v) => setScope(v as "read" | "readwrite")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="read">Read-only</SelectItem>
-                  <SelectItem value="readwrite">Read &amp; write</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Read-only tokens can only access GET endpoints. Read &amp; write tokens can trigger re-reviews and manage settings.
-              </p>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm">Scope</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: "read",      icon: <Eye className="h-5 w-5" />,    label: "Read-only",    desc: "GET endpoints only" },
+                  { value: "readwrite", icon: <Pencil className="h-5 w-5" />, label: "Read & write", desc: "Trigger reviews & manage settings" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setScope(opt.value)}
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors cursor-pointer ${
+                      scope === opt.value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground"
+                    }`}
+                  >
+                    {opt.icon}
+                    <span className="text-sm font-medium">{opt.label}</span>
+                    <span className="text-xs">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <Label>Expiry date <span className="text-muted-foreground font-normal">(optional)</span></Label>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm">Expiry <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <div className="flex flex-wrap gap-2">
+                {EXPIRY_PRESETS.map((p) => {
+                  const val = p.days === 0 ? "" : addDays(p.days);
+                  const selected = expiresAt === val;
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => setExpiresAt(val)}
+                      className={`rounded-full px-3 py-1 text-sm border transition-colors cursor-pointer ${
+                        selected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+                {expiresAt !== "" && !EXPIRY_PRESETS.some((p) => expiresAt === (p.days === 0 ? "" : addDays(p.days))) && (
+                  <span className="rounded-full px-3 py-1 text-sm border bg-primary text-primary-foreground border-primary">
+                    Custom
+                  </span>
+                )}
+              </div>
               <Input
                 type="date"
                 value={expiresAt}
@@ -209,8 +260,8 @@ export default function APITokensPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={saving || !name.trim()}>
+            <Button variant="ghost" size="lg" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button size="lg" onClick={handleCreate} disabled={saving || !name.trim()}>
               {saving ? "Generating…" : "Generate"}
             </Button>
           </DialogFooter>
@@ -219,21 +270,20 @@ export default function APITokensPage() {
 
       {/* New token reveal dialog */}
       <Dialog open={!!newToken} onOpenChange={() => setNewToken(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Token created — copy it now</DialogTitle>
+            <DialogTitle className="text-xl">Token created — copy it now</DialogTitle>
+            <DialogDescription>This is the only time the raw token will be shown. Store it somewhere safe.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              This is the only time the raw token will be shown. Store it somewhere safe.
-            </p>
+          <div className="py-2">
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted rounded px-3 py-2 text-sm font-mono break-all select-all">
+              <code className="flex-1 bg-muted rounded-md px-3 py-2.5 text-sm font-mono break-all select-all">
                 {newToken?.token}
               </code>
               <Button
                 size="icon"
                 variant="outline"
+                className="cursor-pointer shrink-0"
                 onClick={() => newToken && copyToClipboard(newToken.token)}
                 aria-label="Copy token"
               >
@@ -242,7 +292,26 @@ export default function APITokensPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setNewToken(null)}>Done</Button>
+            <Button size="lg" onClick={() => setNewToken(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm revoke dialog */}
+      <Dialog open={confirmRevokeId != null} onOpenChange={(o) => { if (!o) setConfirmRevokeId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Revoke token?</DialogTitle>
+            <DialogDescription className="text-base">
+              <strong>{tokens.find((t) => t.ID === confirmRevokeId)?.Name || "This token"}</strong> will
+              be permanently revoked. Any integrations using it will stop working immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="lg" onClick={() => setConfirmRevokeId(null)}>Cancel</Button>
+            <Button variant="destructive" size="lg" onClick={handleRevoke} disabled={revoking}>
+              {revoking ? "Revoking…" : "Revoke"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

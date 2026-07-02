@@ -140,7 +140,7 @@ APP_ENV=development
 DATABASE_URL=postgres://pr_reviewer:pr_reviewer@localhost:5432/pr_reviewer?sslmode=disable
 
 # GitHub OAuth App — https://github.com/settings/developers
-#   Homepage URL:           http://localhost:3000
+#   Homepage URL:           $FRONTEND_URL  (e.g. http://localhost:3000)
 #   Authorization callback: http://localhost:8001/auth/github/callback
 GITHUB_CLIENT_ID=your_client_id
 GITHUB_CLIENT_SECRET=your_client_secret

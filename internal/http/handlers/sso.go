@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/Astraxx04/pr-reviewer/internal/audit"
 	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	"github.com/Astraxx04/pr-reviewer/pkg/logger"
@@ -110,6 +111,19 @@ func (h *SSOHandler) PutConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "issuer and client_id required")
 		return
 	}
+	// Normalize: ensure issuer has an https:// scheme.
+	if !strings.HasPrefix(body.Issuer, "http://") && !strings.HasPrefix(body.Issuer, "https://") {
+		body.Issuer = "https://" + body.Issuer
+	}
+
+	// Validate role_mapping keys — only the three platform roles are allowed.
+	validRoleMappingKeys := map[string]bool{"owner": true, "admin": true, "reviewer": true}
+	for k := range body.RoleMapping {
+		if !validRoleMappingKeys[k] {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid role in role_mapping: %q (must be owner, admin, or reviewer)", k))
+			return
+		}
+	}
 
 	var secretEnc string
 	if body.ClientSecret != "" {
@@ -155,6 +169,8 @@ func (h *SSOHandler) PutConfig(w http.ResponseWriter, r *http.Request) {
 	h.cachedJWKS = nil
 	h.mu.Unlock()
 
+	audit.Log(h.db, r, user.Login, user.ID, "sso.config_updated", "sso", "1",
+		nil, map[string]any{"issuer": body.Issuer, "client_id": body.ClientID, "enabled": body.Enabled})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -166,6 +182,7 @@ func (h *SSOHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.db.WithContext(r.Context()).Where("id = 1").Delete(&models.OIDCConfig{})
+	audit.Log(h.db, r, user.Login, user.ID, "sso.config_deleted", "sso", "1", nil, nil)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -342,11 +359,11 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 // mapRole derives a platform role from OIDC claims using the role_mapping config.
 func (h *SSOHandler) mapRole(cfg *models.OIDCConfig, claims jwt.MapClaims) string {
 	if len(cfg.RoleMapping) == 0 {
-		return "viewer"
+		return "reviewer"
 	}
 	var mapping map[string][]string
 	if err := json.Unmarshal(cfg.RoleMapping, &mapping); err != nil {
-		return "viewer"
+		return "reviewer"
 	}
 
 	var attrMapping map[string]string
@@ -373,7 +390,7 @@ func (h *SSOHandler) mapRole(cfg *models.OIDCConfig, claims jwt.MapClaims) strin
 	}
 
 	// Check roles in priority order.
-	for _, role := range []string{"owner", "admin", "reviewer", "viewer"} {
+	for _, role := range []string{"owner", "admin", "reviewer"} {
 		groups, ok := mapping[role]
 		if !ok {
 			continue
@@ -389,7 +406,7 @@ func (h *SSOHandler) mapRole(cfg *models.OIDCConfig, claims jwt.MapClaims) strin
 			}
 		}
 	}
-	return "viewer"
+	return "reviewer"
 }
 
 // loadConfig fetches the OIDCConfig and decrypts the client secret.

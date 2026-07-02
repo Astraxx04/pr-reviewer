@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToken } from "@/hooks/useToken";
 import {
   listProviders, createProvider, updateProvider, deleteProvider, testProvider, getProviderHealth, listProviderModels,
@@ -9,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,14 +24,15 @@ const PROVIDER_TYPES = Object.keys(PROVIDER_TYPE_META);
 const DEFAULT_FORM: CreateProviderBody = { name: "", type: "openai" };
 
 function healthBadge(entry?: ProviderHealthEntry) {
-  if (!entry || entry.status === "untested") return <span className="text-xs text-muted-foreground">Untested</span>;
-  if (entry.status === "healthy") return <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 className="h-3 w-3" /> Healthy</span>;
-  if (entry.status === "degraded") return <span className="flex items-center gap-1 text-xs text-yellow-600"><AlertTriangle className="h-3 w-3" /> Degraded</span>;
-  return <span className="flex items-center gap-1 text-xs text-destructive"><XCircle className="h-3 w-3" /> Unreachable</span>;
+  if (!entry || entry.status === "untested") return <span className="text-sm text-muted-foreground">Untested</span>;
+  if (entry.status === "healthy") return <span className="flex items-center gap-1 text-sm text-green-600"><CheckCircle2 className="h-4 w-4" /> Healthy</span>;
+  if (entry.status === "degraded") return <span className="flex items-center gap-1 text-sm text-yellow-600"><AlertTriangle className="h-4 w-4" /> Degraded</span>;
+  return <span className="flex items-center gap-1 text-sm text-destructive"><XCircle className="h-4 w-4" /> Unreachable</span>;
 }
 
 export default function ProvidersPage() {
   const { token } = useToken();
+  const router = useRouter();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [health, setHealth] = useState<ProviderHealthEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,7 @@ export default function ProvidersPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState<CreateProviderBody>(DEFAULT_FORM);
   const [models, setModels] = useState<{ id: string; display_name?: string }[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -140,11 +144,12 @@ export default function ProvidersPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!token) return;
+  async function handleDelete() {
+    if (!token || confirmDeleteId == null) return;
     try {
-      await deleteProvider(token, id);
-      setProviders((prev) => prev.filter((p) => p.id !== id));
+      await deleteProvider(token, confirmDeleteId);
+      setProviders((prev) => prev.filter((p) => p.id !== confirmDeleteId));
+      setConfirmDeleteId(null);
       toast.success("Provider removed");
     } catch (e) {
       toast.error(String(e));
@@ -169,59 +174,68 @@ export default function ProvidersPage() {
   if (loading) return <Skeleton className="h-64 w-full" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">AI Providers</h1>
-        <Button onClick={openAdd}>Add Provider</Button>
+    <div className="space-y-8">
+      <div className="flex items-start justify-between">
+        <div>
+          <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+          <h1 className="text-3xl font-bold">AI Providers</h1>
+        </div>
+        <Button size="lg" onClick={openAdd}>Add Provider</Button>
       </div>
 
       {providers.length === 0 ? (
-        <p className="text-muted-foreground">No providers configured yet.</p>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Cpu className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="text-base font-medium text-foreground">No AI providers configured yet.</p>
+            <p className="text-base mt-1">Add an OpenAI, Anthropic, or compatible provider to start reviewing pull requests.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           {providers.map((p) => {
             const typeMeta = PROVIDER_TYPE_META[p.type];
             const h = health.find((e) => e.provider_id === p.id);
             return (
               <Card key={p.id}>
-                <CardHeader className="flex-row items-center gap-3 pb-2">
+                <CardHeader className="flex-row items-center gap-3 pb-3">
                   <Cpu className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-base">{p.name || p.type}</CardTitle>
-                  <Badge variant="secondary" className="ml-auto">
+                  <CardTitle className="text-lg">{p.name || p.type}</CardTitle>
+                  <Badge variant="secondary" className="ml-auto text-sm">
                     {typeMeta?.label ?? p.type}
                   </Badge>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="text-sm text-muted-foreground space-y-1">
+                  <div className="text-base text-muted-foreground space-y-1">
                     {p.default_model && <p>Model: <span className="font-mono">{p.default_model}</span></p>}
-                    {p.base_url && <p>URL: <span className="font-mono text-xs">{p.base_url}</span></p>}
+                    {p.base_url && <p>URL: <span className="font-mono text-sm">{p.base_url}</span></p>}
                     <div className="flex items-center gap-1.5">
                       {p.has_api_key
-                        ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> API key set</>
-                        : <><XCircle className="h-3.5 w-3.5 text-destructive" /> No API key</>}
+                        ? <><CheckCircle2 className="h-4 w-4 text-green-500" /> API key set</>
+                        : <><XCircle className="h-4 w-4 text-destructive" /> No API key</>}
                     </div>
                     <div className="flex items-center gap-2">
                       {healthBadge(h)}
                       {h?.last_tested_at && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-sm text-muted-foreground">
                           {h.latency_ms != null ? `${h.latency_ms}ms · ` : ""}
                           {new Date(h.last_tested_at).toLocaleString()}
                         </span>
                       )}
                     </div>
-                    {h?.error_msg && <p className="text-xs text-destructive">{h.error_msg}</p>}
+                    {h?.error_msg && <p className="text-sm text-destructive">{h.error_msg}</p>}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleTest(p.id)} disabled={testing === p.id}>
-                      <FlaskConical className="h-3 w-3 mr-1" />
+                    <Button variant="outline" onClick={() => handleTest(p.id)} disabled={testing === p.id}>
+                      <FlaskConical className="h-4 w-4 mr-1.5" />
                       {testing === p.id ? "Testing…" : "Test"}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => openEdit(p)}>
-                      <Pencil className="h-3 w-3 mr-1" />
+                    <Button variant="outline" onClick={() => openEdit(p)}>
+                      <Pencil className="h-4 w-4 mr-1.5" />
                       Edit
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive ml-auto" onClick={() => handleDelete(p.id)}>
-                      <Trash2 className="h-3 w-3" />
+                    <Button variant="ghost" className="text-destructive ml-auto" onClick={() => setConfirmDeleteId(p.id)}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -231,12 +245,36 @@ export default function ProvidersPage() {
         </div>
       )}
 
+      <Dialog open={confirmDeleteId != null} onOpenChange={(o) => { if (!o) setConfirmDeleteId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Remove provider?</DialogTitle>
+            <DialogDescription className="text-base">
+              <strong>{providers.find((p) => p.id === confirmDeleteId)?.name || "This provider"}</strong> will
+              be permanently removed. Any repos using it as their AI provider will fall back to the installation default.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="lg" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" size="lg" onClick={handleDelete}>Remove</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editingId != null ? "Edit AI Provider" : "Add AI Provider"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>Name</Label>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">{editingId != null ? "Edit AI Provider" : "Add AI Provider"}</DialogTitle>
+            <DialogDescription className="text-base">
+              {editingId != null
+                ? "Update the provider settings. Leave the API key blank to keep the stored value."
+                : "Connect an AI provider to power your code reviews."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 overflow-y-auto max-h-[60vh] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name</Label>
               <Input
                 placeholder="e.g. My Anthropic"
                 value={form.name}
@@ -244,8 +282,8 @@ export default function ProvidersPage() {
               />
             </div>
 
-            <div className="space-y-1">
-              <Label>Provider</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Provider</Label>
               <Select value={form.type} onValueChange={handleTypeChange} disabled={editingId != null}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -255,18 +293,18 @@ export default function ProvidersPage() {
                 </SelectContent>
               </Select>
               {editingId != null && (
-                <p className="text-xs text-muted-foreground">Provider type can&apos;t be changed — delete and re-add to switch.</p>
+                <p className="text-sm text-muted-foreground">Provider type can&apos;t be changed — delete and re-add to switch.</p>
               )}
               {meta.presetBaseUrl && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Endpoint: <span className="font-mono">{meta.presetBaseUrl}</span>
                 </p>
               )}
             </div>
 
             {meta.needsApiKey && (
-              <div className="space-y-1">
-                <Label>API Key</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm">API Key</Label>
                 <Input
                   type="password"
                   placeholder={editingId != null ? "leave blank to keep existing key" : "sk-…"}
@@ -277,8 +315,8 @@ export default function ProvidersPage() {
             )}
 
             {meta.needsBaseUrl && !meta.presetBaseUrl && (
-              <div className="space-y-1">
-                <Label>Base URL</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Base URL</Label>
                 <Input
                   placeholder="http://localhost:11434"
                   value={form.base_url ?? ""}
@@ -287,100 +325,114 @@ export default function ProvidersPage() {
               </div>
             )}
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Default Model</Label>
+                <Label className="text-sm">Default Model</Label>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-7 px-2 text-sm"
                   onClick={handleFetchModels}
                   disabled={fetchingModels || (editingId == null && meta.needsApiKey && !form.api_key)}
                 >
-                  <ListChecks className="h-3 w-3 mr-1" />
+                  <ListChecks className="h-4 w-4 mr-1" />
                   {fetchingModels ? "Fetching…" : "Fetch models"}
                 </Button>
               </div>
               <Input
-                list="provider-models"
                 placeholder={meta.defaultModel ?? "model name…"}
                 value={form.default_model ?? ""}
                 onChange={(e) => setForm({ ...form, default_model: e.target.value })}
               />
               {models.length > 0 && (
-                <datalist id="provider-models">
+                <div className="overflow-y-auto max-h-36 rounded-md border p-2 flex flex-wrap gap-1.5">
                   {models.map((m) => (
-                    <option key={m.id} value={m.id}>{m.display_name || m.id}</option>
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, default_model: m.id })}
+                      className={`rounded-full px-2.5 py-0.5 text-xs border transition-colors cursor-pointer ${
+                        form.default_model === m.id
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
+                      }`}
+                    >
+                      {m.display_name || m.id}
+                    </button>
                   ))}
-                </datalist>
-              )}
-              {models.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {models.length} models available — start typing to pick one.
-                </p>
+                </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="embeddings"
+            <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Use for embeddings (RAG)</p>
+                <p className="text-sm text-muted-foreground">Index your codebase to give reviews more context</p>
+              </div>
+              <Switch
                 checked={form.supports_embeddings ?? false}
-                onChange={(e) => setForm({ ...form, supports_embeddings: e.target.checked })}
-                className="h-4 w-4"
+                onCheckedChange={(checked) => setForm({ ...form, supports_embeddings: checked })}
+                className="cursor-pointer"
               />
-              <Label htmlFor="embeddings" className="cursor-pointer font-normal">
-                Use for embeddings (RAG)
-              </Label>
             </div>
 
             {form.supports_embeddings && (() => {
-              // Suggest embedding-looking models from the fetched list; fall back to
-              // the full list if none match the "embed" heuristic.
               const embedModels = models.filter((m) => /embed/i.test(m.id));
               const suggestions = embedModels.length ? embedModels : models;
               return (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label>Embedding model</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={handleFetchModels}
-                      disabled={fetchingModels || (editingId == null && meta.needsApiKey && !form.api_key)}
-                    >
-                      <ListChecks className="h-3 w-3 mr-1" />
-                      {fetchingModels ? "Fetching…" : "Fetch models"}
-                    </Button>
+                <div className="rounded-lg border px-4 py-4 space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Embedding model</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-sm"
+                        onClick={handleFetchModels}
+                        disabled={fetchingModels || (editingId == null && meta.needsApiKey && !form.api_key)}
+                      >
+                        <ListChecks className="h-4 w-4 mr-1" />
+                        {fetchingModels ? "Fetching…" : "Fetch models"}
+                      </Button>
+                    </div>
+                    <Input
+                      placeholder={form.type === "ollama" ? "nomic-embed-text" : "text-embedding-3-small"}
+                      value={form.embedding_model ?? ""}
+                      onChange={(e) => setForm({ ...form, embedding_model: e.target.value })}
+                    />
+                    {suggestions.length > 0 && (
+                      <div className="overflow-y-auto max-h-36 rounded-md border p-2 flex flex-wrap gap-1.5">
+                        {suggestions.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setForm({ ...form, embedding_model: m.id })}
+                            className={`rounded-full px-2.5 py-0.5 text-xs border transition-colors cursor-pointer ${
+                              form.embedding_model === m.id
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted text-muted-foreground border-transparent hover:border-border hover:text-foreground"
+                            }`}
+                          >
+                            {m.display_name || m.id}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Must be a dedicated embeddings model, not a chat model. Leave blank to use{" "}
+                      <span className="font-mono">{form.type === "ollama" ? "nomic-embed-text" : "text-embedding-3-small"}</span>.
+                    </p>
                   </div>
-                  <Input
-                    list="embedding-models"
-                    placeholder={form.type === "ollama" ? "nomic-embed-text" : "text-embedding-3-small"}
-                    value={form.embedding_model ?? ""}
-                    onChange={(e) => setForm({ ...form, embedding_model: e.target.value })}
-                  />
-                  {suggestions.length > 0 && (
-                    <datalist id="embedding-models">
-                      {suggestions.map((m) => (
-                        <option key={m.id} value={m.id}>{m.display_name || m.id}</option>
-                      ))}
-                    </datalist>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    A dedicated embeddings model — <strong>not</strong> a chat model. Using a chat
-                    model (e.g. gpt-4o) here will fail. Leave blank to default to{" "}
-                    <span className="font-mono">{form.type === "ollama" ? "nomic-embed-text" : "text-embedding-3-small"}</span>.
-                  </p>
                 </div>
               );
             })()}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.type || saving}>
+            <Button variant="outline" size="lg" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button size="lg" onClick={handleSave} disabled={!form.type || saving}>
               {saving ? "Saving…" : editingId != null ? "Save changes" : "Save"}
             </Button>
           </DialogFooter>

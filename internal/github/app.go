@@ -116,6 +116,38 @@ func ListInstallationRepos(ctx context.Context, appID int64, privateKeyPEM []byt
 	return repos, nil
 }
 
+// InstallationInfo is a minimal description of a GitHub App installation.
+type InstallationInfo struct {
+	ID           int64
+	AccountLogin string
+	AccountType  string
+}
+
+// FindFirstInstallation calls GET /app/installations and returns the first result.
+// Used during initial setup when the installation.created webhook was missed.
+func FindFirstInstallation(ctx context.Context, appID int64, privateKeyPEM []byte) (*InstallationInfo, error) {
+	appJWT, err := CreateAppJWT(appID, privateKeyPEM)
+	if err != nil {
+		return nil, err
+	}
+	appClient := newRawClient(ctx, appJWT)
+	start := time.Now()
+	installs, _, err := appClient.Apps.ListInstallations(ctx, &gogithub.ListOptions{PerPage: 1})
+	logger.ExternalCall(ctx, "github", "Apps.ListInstallations", start, err, "app_id", appID)
+	if err != nil {
+		return nil, fmt.Errorf("github app: list installations: %w", err)
+	}
+	if len(installs) == 0 {
+		return nil, fmt.Errorf("github app: no installations found — install the GitHub App on your organization")
+	}
+	i := installs[0]
+	return &InstallationInfo{
+		ID:           i.GetID(),
+		AccountLogin: i.GetAccount().GetLogin(),
+		AccountType:  i.GetAccount().GetType(),
+	}, nil
+}
+
 // newRawClient creates a raw go-github client authenticated with the given token.
 func newRawClient(ctx context.Context, token string) *gogithub.Client {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})

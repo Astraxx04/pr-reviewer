@@ -12,11 +12,9 @@ type ProviderRepo struct{ db *gorm.DB }
 
 func NewProviderRepo(db *gorm.DB) *ProviderRepo { return &ProviderRepo{db: db} }
 
-func (r *ProviderRepo) List(ctx context.Context, installationID uint) ([]models.ProviderConfig, error) {
+func (r *ProviderRepo) List(ctx context.Context) ([]models.ProviderConfig, error) {
 	var providers []models.ProviderConfig
-	err := r.db.WithContext(ctx).
-		Where("installation_id = ? OR installation_id = 0", installationID).
-		Find(&providers).Error
+	err := r.db.WithContext(ctx).Find(&providers).Error
 	return providers, err
 }
 
@@ -28,16 +26,12 @@ func (r *ProviderRepo) Update(ctx context.Context, p *models.ProviderConfig) err
 	return r.db.WithContext(ctx).Save(p).Error
 }
 
-func (r *ProviderRepo) Delete(ctx context.Context, id, installationID uint) error {
-	return r.db.WithContext(ctx).
-		Where("id = ? AND (installation_id = ? OR installation_id = 0)", id, installationID).
-		Delete(&models.ProviderConfig{}).Error
+func (r *ProviderRepo) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&models.ProviderConfig{}, id).Error
 }
 
-func (r *ProviderRepo) FindByID(ctx context.Context, id, installationID uint) (*models.ProviderConfig, error) {
+func (r *ProviderRepo) FindByID(ctx context.Context, id uint) (*models.ProviderConfig, error) {
 	var p models.ProviderConfig
-	err := r.db.WithContext(ctx).
-		Where("id = ? AND (installation_id = ? OR installation_id = 0)", id, installationID).
-		First(&p).Error
+	err := r.db.WithContext(ctx).First(&p, id).Error
 	return &p, err
 }

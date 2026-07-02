@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToken } from "@/hooks/useToken";
 import {
   getJiraConfig,
@@ -29,6 +30,7 @@ import { FlaskConical, Trash2, CheckCircle2 } from "lucide-react";
 
 export default function JiraIntegrationPage() {
   const { token } = useToken();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [existing, setExisting] = useState<JiraConfigStatus | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
@@ -75,7 +77,6 @@ export default function JiraIntegrationPage() {
         enabled,
       });
       toast.success("Jira integration saved");
-      // Refresh state
       const updated = await getJiraConfig(token);
       setExisting(updated);
       setApiToken("");
@@ -136,18 +137,19 @@ export default function JiraIntegrationPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 max-w-2xl">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Jira Integration</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+          <h1 className="text-3xl font-bold">Jira Integration</h1>
+          <p className="text-base text-muted-foreground mt-1">
             When a PR title or description references a Jira ticket (e.g.{" "}
             <code className="text-xs bg-muted px-1 rounded">PROJ-123</code>), the ticket
             summary and status are automatically included in the AI review prompt.
           </p>
         </div>
         {existing && (
-          <Badge variant={existing.enabled ? "default" : "secondary"}>
+          <Badge variant={existing.enabled ? "default" : "secondary"} className="mt-10 shrink-0">
             {existing.enabled ? "Active" : "Disabled"}
           </Badge>
         )}
@@ -155,50 +157,49 @@ export default function JiraIntegrationPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Step-by-step setup</CardTitle>
-          <CardDescription>For Jira Cloud (an <code className="text-xs">…atlassian.net</code> site). Atlassian authenticates with your email + an API token.</CardDescription>
+          <CardTitle className="text-lg">Step-by-step setup</CardTitle>
+          <CardDescription className="text-base">For Jira Cloud (an <code className="text-xs">…atlassian.net</code> site). Atlassian authenticates with your email + an API token.</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm">
+        <CardContent className="text-base text-muted-foreground">
           <ol className="list-decimal space-y-4 pl-5">
             <li>
-              <span className="font-medium">Get your Jira base URL.</span> It&apos;s your Atlassian site root —
+              <span className="font-medium text-foreground">Get your Jira base URL.</span> It&apos;s your Atlassian site root —
               e.g. <code className="text-xs bg-muted px-1 rounded">https://yourcompany.atlassian.net</code> (everything
               before <code className="text-xs">/jira</code>). Paste it into <strong>Jira base URL</strong> below.
             </li>
             <li>
-              <span className="font-medium">Use your account email.</span> The email you sign in to Jira with —
+              <span className="font-medium text-foreground">Use your account email.</span> The email you sign in to Jira with —
               paste it into <strong>Jira account email</strong>.
             </li>
             <li>
-              <span className="font-medium">Create an API token.</span> Go to{" "}
+              <span className="font-medium text-foreground">Create an API token.</span> Go to{" "}
               <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener noreferrer" className="underline">
                 id.atlassian.com → Security → API tokens
               </a>{" "}
               → <strong>Create API token</strong>, label it (e.g. &ldquo;PR Reviewer&rdquo;), copy it, and paste into{" "}
-              <strong>API token</strong>. Use a token, <strong>not</strong> your password — Atlassian Cloud REST auth is email + token.
+              <strong>API token</strong>. Use a token, <strong>not</strong> your password.
             </li>
             <li>
-              <span className="font-medium">Save, then test.</span> Click <strong>Save</strong>, then{" "}
+              <span className="font-medium text-foreground">Save, then test.</span> Click <strong>Save</strong>, then{" "}
               <strong>Test connection</strong> — it calls Jira&apos;s <code className="text-xs">/myself</code> and shows which
-              account it authenticated as, confirming the credentials work.
+              account it authenticated as.
             </li>
             <li>
-              <span className="font-medium">Reference tickets in PRs.</span> Put an issue key like{" "}
+              <span className="font-medium text-foreground">Reference tickets in PRs.</span> Put an issue key like{" "}
               <code className="text-xs bg-muted px-1 rounded">PROJ-123</code> in a PR&apos;s title or description.
-              On the next review the bot fetches that ticket and feeds its summary into the AI prompt — no other action needed.
+              On the next review the bot fetches that ticket and feeds its summary into the AI prompt.
             </li>
           </ol>
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="mt-4 text-sm">
             Read-only access is enough — the integration only reads issues (<code className="text-xs">GET /rest/api/3/issue</code>).
-            A token scoped to an account that can view the relevant projects is all you need.
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Jira credentials</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg">Jira credentials</CardTitle>
+          <CardDescription className="text-base">
             Use a{" "}
             <a
               href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/"
@@ -211,9 +212,9 @@ export default function JiraIntegrationPage() {
             (not your password). The token is stored encrypted.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="jira-url">Jira base URL</Label>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="jira-url">Jira base URL</Label>
             <Input
               id="jira-url"
               placeholder="https://yourcompany.atlassian.net"
@@ -221,8 +222,8 @@ export default function JiraIntegrationPage() {
               onChange={(e) => setBaseUrl(e.target.value)}
             />
           </div>
-          <div>
-            <Label htmlFor="jira-email">Jira account email</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="jira-email">Jira account email</Label>
             <Input
               id="jira-email"
               type="email"
@@ -231,13 +232,11 @@ export default function JiraIntegrationPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div>
-            <Label htmlFor="jira-token">
+          <div className="space-y-1.5">
+            <Label className="text-sm" htmlFor="jira-token">
               API token{" "}
               {existing && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  (leave blank to keep existing)
-                </span>
+                <span className="font-normal text-muted-foreground">(leave blank to keep existing)</span>
               )}
             </Label>
             <Input
@@ -249,62 +248,61 @@ export default function JiraIntegrationPage() {
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <Switch id="jira-enabled" checked={enabled} onCheckedChange={setEnabled} />
-            <Label htmlFor="jira-enabled">Enable Jira context injection</Label>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="text-base font-medium">Enable Jira context injection</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Inject matching ticket context into AI review prompts</p>
+            </div>
+            <Switch id="jira-enabled" checked={enabled} onCheckedChange={setEnabled} className="cursor-pointer" />
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button onClick={handleSave} disabled={saving}>
+          {testResult && (
+            <div className="rounded-lg border bg-muted/40 p-4 space-y-1">
+              <div className="flex items-center gap-1.5 font-medium text-green-600">
+                <CheckCircle2 className="h-5 w-5" /> Connected to Jira
+              </div>
+              {testResult.display_name && <div className="text-base">Account: <span className="font-medium">{testResult.display_name}</span></div>}
+              {testResult.email && <div className="text-sm text-muted-foreground">{testResult.email}</div>}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button size="lg" onClick={handleSave} disabled={saving}>
               {saving ? "Saving…" : "Save"}
             </Button>
             {existing && (
-              <Button
-                variant="outline"
-                onClick={handleTest}
-                disabled={testing}
-              >
-                <FlaskConical className="h-4 w-4 mr-2" />
+              <Button size="lg" variant="outline" onClick={handleTest} disabled={testing}>
+                <FlaskConical className="h-5 w-5 mr-2" />
                 {testing ? "Testing…" : "Test connection"}
               </Button>
             )}
             {existing && (
               <Button
+                size="lg"
                 variant="ghost"
                 className="text-destructive ml-auto"
                 onClick={() => setDeleteOpen(true)}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="h-5 w-5 mr-2" />
                 Remove
               </Button>
             )}
           </div>
-
-          {testResult && (
-            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
-              <div className="flex items-center gap-1.5 font-medium text-green-600">
-                <CheckCircle2 className="h-4 w-4" /> Connected to Jira
-              </div>
-              {testResult.display_name && <div>Account: <span className="font-medium">{testResult.display_name}</span></div>}
-              {testResult.email && <div className="text-muted-foreground text-xs">{testResult.email}</div>}
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {existing && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">How ticket detection works</CardTitle>
+            <CardTitle className="text-lg">How ticket detection works</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
+          <CardContent className="text-base text-muted-foreground space-y-3">
             <p>
               When a PR is opened or updated, the reviewer scans the title and description for
               Jira issue keys — <strong>your</strong> project key, a hyphen, then the issue number,
               like <code className="bg-muted px-1 rounded text-xs">PROJ-123</code> or{" "}
               <code className="bg-muted px-1 rounded text-xs">ENG-4567</code>. The key is 2–10
-              characters, starts with an uppercase letter, and may contain digits — &ldquo;PROJ&rdquo;/&ldquo;ENG&rdquo;
-              are just examples, use whatever your Jira projects use.
+              characters, starts with an uppercase letter, and may contain digits.
             </p>
             <p>
               Up to 3 matching tickets are fetched and their summary, type, and status are added
@@ -316,16 +314,16 @@ export default function JiraIntegrationPage() {
       )}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Remove Jira integration?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl">Remove Jira integration?</DialogTitle>
+            <DialogDescription className="text-base">
               Ticket context will no longer be injected into reviews. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+            <Button size="lg" variant="ghost" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button size="lg" variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? "Removing…" : "Remove"}
             </Button>
           </DialogFooter>

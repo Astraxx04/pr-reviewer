@@ -10,6 +10,7 @@ import (
 	"github.com/riverqueue/river/rivertype"
 	"gorm.io/gorm"
 
+	dbpkg "github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 	"github.com/Astraxx04/pr-reviewer/internal/jobs"
@@ -21,17 +22,19 @@ type prEnqueuer interface {
 }
 
 type PRHandler struct {
-	db       *gorm.DB
-	enqueuer prEnqueuer // nil when river is not configured
-	ghClient gh.Client  // optional; enables the /diff endpoint
+	db            *gorm.DB
+	enqueuer      prEnqueuer // nil when river is not configured
+	tokenCache    *gh.InstallationTokenCache
+	encryptionKey string
 }
 
 func NewPRHandler(db *gorm.DB, enqueuer prEnqueuer) *PRHandler {
 	return &PRHandler{db: db, enqueuer: enqueuer}
 }
 
-func (h *PRHandler) WithGHClient(c gh.Client) *PRHandler {
-	h.ghClient = c
+func (h *PRHandler) WithTokenCache(cache *gh.InstallationTokenCache, encKey string) *PRHandler {
+	h.tokenCache = cache
+	h.encryptionKey = encKey
 	return h
 }
 
@@ -312,7 +315,7 @@ func (h *PRHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Diff proxies the PR unified diff from GitHub so the frontend can render it.
 func (h *PRHandler) Diff(w http.ResponseWriter, r *http.Request) {
-	if h.ghClient == nil {
+	if h.tokenCache == nil {
 		writeError(w, http.StatusServiceUnavailable, "GitHub client not configured")
 		return
 	}
@@ -324,7 +327,12 @@ func (h *PRHandler) Diff(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid parameters")
 		return
 	}
-	diffs, err := h.ghClient.GetPullRequestDiff(r.Context(), owner, repoName, number)
+	instClient, err := dbpkg.ResolveInstallationClient(r.Context(), h.db, h.encryptionKey, h.tokenCache)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "failed to get GitHub client: "+err.Error())
+		return
+	}
+	diffs, err := instClient.GetPullRequestDiff(r.Context(), owner, repoName, number)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "failed to fetch diff: "+err.Error())
 		return

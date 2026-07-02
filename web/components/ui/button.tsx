@@ -44,8 +44,11 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  // asChild is a Radix UI convention; base-ui/button doesn't support it — strip it
+  // so it never reaches the DOM.
+  asChild: _asChild,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   return (
     <ButtonPrimitive
       data-slot="button"

@@ -39,7 +39,7 @@ function StepIndicator({
           <button
             onClick={() => onStepClick(i)}
             style={{ cursor: 'pointer' }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-base font-medium transition-colors ${
               i === current
                 ? "bg-primary text-primary-foreground"
                 : states[i]
@@ -115,7 +115,7 @@ export default function SetupPage() {
           <div className="flex justify-center mb-4">
             <Image src="/logo.png" alt="PR Reviewer" width={1024} height={1024} style={{ height: '6rem', width: 'auto' }} priority />
           </div>
-          <p className="text-muted-foreground">Let's get your self-hosted instance configured.</p>
+          <p className="text-base text-muted-foreground">Let's get your self-hosted instance configured.</p>
         </div>
 
         <StepIndicator
@@ -128,36 +128,52 @@ export default function SetupPage() {
         {step === 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="text-xl flex items-center gap-2">
                 <Database className="h-5 w-5" />
                 Database
               </CardTitle>
-              <CardDescription>Verifies the backend is reachable and the database is connected.</CardDescription>
+              <CardDescription className="text-sm">Checks that the backend is reachable and the database is connected.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               {serverDown ? (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-destructive font-medium">
-                    <XCircle className="h-5 w-5" />
-                    Server not reachable
+                <>
+                  <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-destructive font-semibold text-base">
+                      <XCircle className="h-5 w-5 shrink-0" />
+                      Backend server not reachable
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      The setup wizard could not connect to the API. Check the following:
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
+                      <li>Is the backend container / process running? (<code className="text-xs bg-muted px-1 rounded">docker compose up</code>)</li>
+                      <li>Is <code className="text-xs bg-muted px-1 rounded">DATABASE_URL</code> set and the DB reachable?</li>
+                      <li>Check server logs for migration or startup errors.</li>
+                      <li>Confirm the API port is not blocked by a firewall.</li>
+                    </ul>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Make sure the backend server is running and the API is accessible before continuing.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={loadStatus}>
-                    Retry
-                  </Button>
-                </div>
+                  <Button variant="outline" onClick={loadStatus}>Retry connection</Button>
+                </>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 text-green-600 font-medium">
-                    <CheckCircle2 className="h-5 w-5" />
-                    Database connected
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2.5 text-green-600 font-medium text-base">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" />
+                      Backend server reachable
+                    </div>
+                    <div className="flex items-center gap-2.5 text-green-600 font-medium text-base">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" />
+                      Database connection healthy
+                    </div>
+                    <div className="flex items-center gap-2.5 text-green-600 font-medium text-base">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" />
+                      Migrations applied
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    The backend is running and the database connection is healthy.
+                    The backend is running and the database is ready. You can proceed to configure GitHub OAuth.
                   </p>
-                  <Button onClick={() => setStep(1)}>Next: GitHub →</Button>
+                  <Button size="lg" onClick={() => setStep(1)}>Next: GitHub OAuth →</Button>
                 </>
               )}
             </CardContent>
@@ -167,36 +183,62 @@ export default function SetupPage() {
         {step === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="text-xl flex items-center gap-2">
                 <GitBranch className="h-5 w-5" />
                 GitHub OAuth
               </CardTitle>
-              <CardDescription>
-                Required — without this, users cannot sign in.
+              <CardDescription className="text-sm">
+                Required — users sign in via GitHub. You need a GitHub OAuth App for this instance.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               {status?.github_configured ? (
                 <>
-                  <div className="flex items-center gap-2 text-green-600 font-medium">
-                    <CheckCircle2 className="h-5 w-5" />
-                    GitHub OAuth configured
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2.5 text-green-600 font-medium text-base">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" />
+                      <code className="text-sm font-mono">GITHUB_CLIENT_ID</code> is set
+                    </div>
+                    <div className="flex items-center gap-2.5 text-green-600 font-medium text-base">
+                      <CheckCircle2 className="h-5 w-5 shrink-0" />
+                      <code className="text-sm font-mono">GITHUB_CLIENT_SECRET</code> is set
+                    </div>
                   </div>
-                  <Button onClick={() => setStep(2)}>Next: Launch →</Button>
+                  <p className="text-sm text-muted-foreground">
+                    GitHub OAuth is configured. Users will be able to sign in with their GitHub account.
+                  </p>
+                  <Button size="lg" onClick={() => setStep(2)}>Next: Launch →</Button>
                 </>
               ) : (
                 <>
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 text-sm space-y-3">
-                    <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
-                      <XCircle className="h-4 w-4" />
-                      GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are not set
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
+                    <div className="flex items-center gap-2.5 font-semibold text-base text-amber-800 dark:text-amber-300">
+                      <XCircle className="h-5 w-5 shrink-0" />
+                      GitHub OAuth credentials not set
                     </div>
-                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                      <li>Go to GitHub → Settings → Developer settings → OAuth Apps → New OAuth App</li>
-                      <li>Set <strong>Authorization callback URL</strong> to <code>{"{SERVER_URL}/auth/github/callback"}</code></li>
-                      <li>Copy the Client ID + Secret into your environment and restart the server</li>
+                    <p className="text-sm text-muted-foreground">
+                      Set <code className="text-xs bg-muted px-1 rounded">GITHUB_CLIENT_ID</code> and{" "}
+                      <code className="text-xs bg-muted px-1 rounded">GITHUB_CLIENT_SECRET</code> in your environment, then restart the server.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">How to create a GitHub OAuth App under your organization:</p>
+                    <ol className="text-sm text-muted-foreground space-y-2 list-decimal pl-5">
+                      <li>
+                        On GitHub, go to your <strong>organization page</strong> → <strong>Settings</strong> → <strong>Developer settings</strong> → <strong>OAuth Apps</strong> → <strong>New OAuth App</strong>
+                      </li>
+                      <li>
+                        Set <strong>Authorization callback URL</strong> to:
+                        <div className="mt-1 rounded bg-muted px-3 py-1.5 font-mono text-xs">
+                          {process.env.NEXT_PUBLIC_API_URL}/auth/github/callback
+                        </div>
+                      </li>
+                      <li>Click <strong>Register application</strong>, then copy the Client ID and generate a Client Secret</li>
+                      <li>Add both to your <code className="text-xs bg-muted px-1 rounded">.env</code> and restart the server</li>
                     </ol>
                   </div>
+
                   <Button variant="outline" onClick={() => { loadStatus(); toast.info("Status refreshed"); }}>
                     Refresh status
                   </Button>
@@ -209,36 +251,49 @@ export default function SetupPage() {
         {step === 2 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="text-xl flex items-center gap-2">
                 <Rocket className="h-5 w-5" />
                 Ready to launch
               </CardTitle>
-              <CardDescription>Review your setup and complete the wizard.</CardDescription>
+              <CardDescription className="text-sm">Review your setup summary before completing.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  {!serverDown
-                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    : <XCircle className="h-4 w-4 text-destructive" />}
-                  Database {serverDown ? "— server not reachable" : "connected"}
-                </div>
-                <div className="flex items-center gap-2">
-                  {status?.github_configured
-                    ? <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    : <XCircle className="h-4 w-4 text-destructive" />}
-                  GitHub OAuth {status?.github_configured ? "configured" : "— not configured, users cannot sign in"}
+            <CardContent className="space-y-5">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Setup summary</p>
+                <div className="space-y-2.5 text-base">
+                  <div className="flex items-center gap-2.5">
+                    {!serverDown
+                      ? <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                      : <XCircle className="h-5 w-5 shrink-0 text-destructive" />}
+                    <span>Database — {serverDown ? <span className="text-destructive">server not reachable</span> : "connected"}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    {status?.github_configured
+                      ? <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                      : <XCircle className="h-5 w-5 shrink-0 text-destructive" />}
+                    <span>GitHub OAuth — {status?.github_configured ? "configured" : <span className="text-destructive">not configured</span>}</span>
+                  </div>
                 </div>
               </div>
+
               {!status?.github_configured && (
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  GitHub OAuth is not configured. Go back and set it up before completing.
-                </p>
+                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  GitHub OAuth is not configured. Go back to step 2 and set it up before completing — users will not be able to sign in without it.
+                </div>
               )}
-              <p className="text-sm text-muted-foreground">
-                Add an AI provider and configure your GitHub App in <strong>Settings</strong> after logging in.
-              </p>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">What happens next</p>
+                <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
+                  <li>You'll be taken to the login page — sign in with your GitHub account to become the <strong>owner</strong></li>
+                  <li>Connect a <strong>GitHub App</strong> in Settings to enable PR review webhooks</li>
+                  <li>Add an <strong>AI provider</strong> (OpenAI, Anthropic, etc.) in Settings</li>
+                  <li>Invite your team members from the <strong>Team</strong> page</li>
+                </ul>
+              </div>
+
               <Button
+                size="lg"
                 onClick={finish}
                 disabled={completing || !status?.github_configured || serverDown}
               >

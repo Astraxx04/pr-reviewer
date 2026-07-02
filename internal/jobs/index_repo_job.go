@@ -12,6 +12,7 @@ import (
 
 	"github.com/Astraxx04/pr-reviewer/internal/ai/embeddings"
 	"github.com/Astraxx04/pr-reviewer/internal/ai/rag"
+	"github.com/Astraxx04/pr-reviewer/internal/db"
 	"github.com/Astraxx04/pr-reviewer/internal/db/models"
 	gh "github.com/Astraxx04/pr-reviewer/internal/github"
 	"github.com/Astraxx04/pr-reviewer/pkg/logger"
@@ -32,10 +33,11 @@ func (IndexRepoJobArgs) Kind() string { return "index_repo" }
 type IndexRepoWorker struct {
 	river.WorkerDefaults[IndexRepoJobArgs]
 
-	GHClient gh.Client
-	DB       *gorm.DB
-	Indexer  *rag.Indexer
-	Log      *logger.Logger
+	TokenCache    *gh.InstallationTokenCache
+	DB            *gorm.DB
+	Indexer       *rag.Indexer
+	Log           *logger.Logger
+	EncryptionKey string
 }
 
 // Timeout overrides River's 1-minute default. Indexing a whole repo makes one
@@ -61,6 +63,13 @@ const maxIndexFileSize = 100 * 1024
 func (w *IndexRepoWorker) Work(ctx context.Context, job *river.Job[IndexRepoJobArgs]) error {
 	args := job.Args
 	w.Log.Info("index repo job started", "owner", args.Owner, "repo", args.Repo)
+
+	instClient, err := db.ResolveInstallationClient(ctx, w.DB, w.EncryptionKey, w.TokenCache)
+	if err != nil {
+		w.Log.Error("failed to resolve GitHub installation client", "error", err)
+		w.setStatus(ctx, args.RepoID, "error")
+		return err
+	}
 
 	w.setStatus(ctx, args.RepoID, "indexing")
 
@@ -90,14 +99,14 @@ func (w *IndexRepoWorker) Work(ctx context.Context, job *river.Job[IndexRepoJobA
 	sha := args.SHA
 	if sha == "" {
 		var err error
-		sha, err = w.GHClient.GetDefaultBranchSHA(ctx, args.Owner, args.Repo)
+		sha, err = instClient.GetDefaultBranchSHA(ctx, args.Owner, args.Repo)
 		if err != nil {
 			w.setStatus(ctx, args.RepoID, "error")
 			return fmt.Errorf("index repo: get default branch SHA: %w", err)
 		}
 	}
 
-	entries, err := w.GHClient.GetRepoTreeEntries(ctx, args.Owner, args.Repo, sha)
+	entries, err := instClient.GetRepoTreeEntries(ctx, args.Owner, args.Repo, sha)
 	if err != nil {
 		w.setStatus(ctx, args.RepoID, "error")
 		return fmt.Errorf("index repo: get tree: %w", err)
@@ -109,7 +118,7 @@ func (w *IndexRepoWorker) Work(ctx context.Context, job *river.Job[IndexRepoJobA
 		if !codeExts[ext] || entry.Size > maxIndexFileSize {
 			continue
 		}
-		content, err := w.GHClient.GetFileContent(ctx, args.Owner, args.Repo, entry.Path)
+		content, err := instClient.GetFileContent(ctx, args.Owner, args.Repo, entry.Path)
 		if err != nil {
 			w.Log.Error("index repo: fetch file failed", "path", entry.Path, "error", err)
 			continue

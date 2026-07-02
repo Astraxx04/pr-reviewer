@@ -76,7 +76,7 @@ func Models() []any {
 		&models.WebhookDelivery{},
 		&models.AssignmentRule{},
 		&models.Assignment{},
-		&models.TeamMember{},
+		&models.Invite{},
 		&models.RepoAccess{},
 		&models.CodeEmbedding{},
 		&models.SystemConfig{},
@@ -107,5 +107,9 @@ func AutoMigrate(db *gorm.DB) error {
 	}
 	// HNSW index for fast vector similarity (requires pgvector >= 0.5.0; non-fatal if unsupported).
 	_ = db.Exec("CREATE INDEX IF NOT EXISTS code_embeddings_hnsw ON code_embeddings USING hnsw (embedding vector_cosine_ops)").Error
+	// Partial unique index: one pending invite per email.
+	_ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS invites_pending_email_uniq
+		ON invites (email)
+		WHERE accepted_at IS NULL`).Error
 	return nil
 }

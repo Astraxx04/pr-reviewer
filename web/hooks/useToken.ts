@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useState, useCallback } from "react";
 import { getToken, clearToken } from "@/lib/auth";
+
+// useLayoutEffect on the client so the token is read before first paint,
+// preventing a flash where admin-only nav items are briefly hidden on refresh.
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 function decodeRole(token: string): string {
   try {
@@ -15,7 +19,7 @@ function decodeRole(token: string): string {
 export function useToken() {
   const [token, setToken] = useState<string | null>(null);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setToken(getToken());
   }, []);
 

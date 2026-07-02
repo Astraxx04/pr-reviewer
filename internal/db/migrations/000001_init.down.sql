@@ -1,5 +1,14 @@
--- Reverse of 000001_init: drop all baseline objects.
+-- Drop everything created by the consolidated init migration.
 
-DROP TABLE IF EXISTS api_tokens, assignment_rules, assignments, audit_logs, bot_comments, bot_replies, code_embeddings, comment_feedbacks, github_app_configs, installations, jira_configs, notification_configs, o_id_c_configs, provider_configs, provider_healths, pull_requests, repo_accesses, repositories, review_comments, reviews, sessions, slack_app_configs, system_configs, team_members, users, webhook_deliveries CASCADE;
+DROP TABLE IF EXISTS public.webhook_deliveries,
+    public.sessions, public.review_comments, public.assignments,
+    public.reviews, public.pull_requests, public.repo_accesses,
+    public.repositories, public.assignment_rules, public.code_embeddings,
+    public.bot_comments, public.bot_replies, public.comment_feedbacks,
+    public.audit_logs, public.provider_healths, public.provider_configs,
+    public.notification_configs, public.invites, public.api_tokens,
+    public.users, public.system_configs, public.slack_app_configs,
+    public.o_id_c_configs, public.jira_configs, public.github_app_configs,
+    public.installations CASCADE;
 
 DROP EXTENSION IF EXISTS vector;

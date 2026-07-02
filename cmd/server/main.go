@@ -65,8 +65,8 @@ func main() {
 
 	eventHub := events.NewHub()
 
-	ghClient := gh.NewClient(cfg.GitHubToken)
-	prService := pr.NewService(ghClient, log)
+	tokenCache := gh.NewInstallationTokenCache()
+	prService := pr.NewService(log)
 
 	orchestrator := ai.NewAgentOrchestrator()
 	orchestrator.RegisterAgent("code-review", agents.NewCodeReviewAgent(registry))
@@ -165,12 +165,6 @@ func main() {
 			embedder = dbEmbedder
 		}
 
-		// Rebuild GitHub client if a DB token was loaded and overrides the env var.
-		if cfg.GitHubToken != "" {
-			ghClient = gh.NewClient(cfg.GitHubToken)
-			prService = pr.NewService(ghClient, log)
-		}
-
 		// Wire RAG retriever + indexer when embedder is available.
 		var retriever *rag.PgvectorRetriever
 		if embedder != nil {
@@ -188,7 +182,7 @@ func main() {
 			PRService:     prService,
 			AIService:     aiService,
 			Aggregator:    aggregator,
-			GHClient:      ghClient,
+			TokenCache:    tokenCache,
 			DB:            gormDB,
 			Log:           log,
 			Indexer:       indexer,
@@ -198,39 +192,34 @@ func main() {
 			FrontendURL:   cfg.FrontendURL,
 		})
 		river.AddWorker(workers, &jobs.ConversationWorker{
-			GHClient:     ghClient,
-			DB:           gormDB,
-			Log:          log,
-			Orchestrator: orchestrator,
-		})
-		river.AddWorker(workers, &jobs.TeamSyncWorker{
-			DB:          gormDB,
-			Log:         log,
-			GitHubToken: cfg.GitHubToken,
+			TokenCache:    tokenCache,
+			DB:            gormDB,
+			Log:           log,
+			Orchestrator:  orchestrator,
+			EncryptionKey: cfg.EncryptionKey,
 		})
 		river.AddWorker(workers, &jobs.EmailDigestWorker{
 			DB:  gormDB,
 			Log: log,
 		})
+		river.AddWorker(workers, &jobs.OrgMembershipCheckWorker{
+			DB:            gormDB,
+			Log:           log,
+			RequiredOrg:   cfg.RequiredGithubOrg,
+			EncryptionKey: cfg.EncryptionKey,
+		})
 		var indexAllReposWorker *jobs.IndexAllReposWorker
 		if indexer != nil {
 			river.AddWorker(workers, &jobs.IndexRepoWorker{
-				GHClient: ghClient,
-				DB:       gormDB,
-				Indexer:  indexer,
-				Log:      log,
+				TokenCache:    tokenCache,
+				DB:            gormDB,
+				Indexer:       indexer,
+				Log:           log,
+				EncryptionKey: cfg.EncryptionKey,
 			})
 			indexAllReposWorker = &jobs.IndexAllReposWorker{DB: gormDB, Log: log}
 			river.AddWorker(workers, indexAllReposWorker)
 		}
-
-		teamSyncPeriodic := river.NewPeriodicJob(
-			river.PeriodicInterval(6*time.Hour),
-			func() (river.JobArgs, *river.InsertOpts) {
-				return jobs.TeamSyncJobArgs{}, nil
-			},
-			&river.PeriodicJobOpts{RunOnStart: false},
-		)
 
 		// Email digests: daily and weekly cadences. The worker only emails configs
 		// whose digest setting matches the period, so both are safe to always schedule.
@@ -249,7 +238,14 @@ func main() {
 			&river.PeriodicJobOpts{RunOnStart: false},
 		)
 
-		periodicJobs := []*river.PeriodicJob{teamSyncPeriodic, dailyDigestPeriodic, weeklyDigestPeriodic}
+		orgCheckPeriodic := river.NewPeriodicJob(
+			river.PeriodicInterval(6*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.OrgMembershipCheckJobArgs{}, nil
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		)
+		periodicJobs := []*river.PeriodicJob{dailyDigestPeriodic, weeklyDigestPeriodic, orgCheckPeriodic}
 		if indexer != nil {
 			// 9.3: Weekly full re-index of all enabled repositories.
 			periodicJobs = append(periodicJobs, river.NewPeriodicJob(
@@ -296,7 +292,7 @@ func main() {
 		webhookHandler = wh
 	} else {
 		log.Info("no DATABASE_URL — using in-process handler (jobs lost on restart)")
-		webhookHandler = prHttp.NewInProcessWebhookHandler(log, prService, aiService, aggregator, ghClient, cfg.GitHubWebhookSecret)
+		webhookHandler = prHttp.NewInProcessWebhookHandler(log, prService, aiService, aggregator, gh.NewClient(""), cfg.GitHubWebhookSecret)
 	}
 
 	routerCfg := prHttp.RouterConfig{
@@ -311,7 +307,7 @@ func main() {
 		routerCfg.AuthHandler = handlers.NewAuthHandler(
 			cfg.GitHubClientID, cfg.GitHubClientSecret,
 			cfg.JWTSecret, cfg.FrontendURL, cfg.ServerURL, gormDB,
-			cfg.RequiredGithubOrg, cfg.InviteOnly, cfg.JWTTTLHours,
+			cfg.RequiredGithubOrg, cfg.JWTTTLHours, cfg.EncryptionKey,
 		)
 		repoHandler := handlers.NewRepoHandler(gormDB, cfg.EncryptionKey)
 		if riverClient != nil && indexer != nil {
@@ -320,7 +316,7 @@ func main() {
 		routerCfg.RepoHandler = repoHandler
 		routerCfg.ReviewHandler = handlers.NewReviewHandler(gormDB)
 		routerCfg.DashHandler = handlers.NewDashboardHandler(gormDB)
-		routerCfg.TeamHandler = handlers.NewTeamHandler(gormDB, riverClient, cfg.FrontendURL)
+		routerCfg.TeamHandler = handlers.NewTeamHandler(gormDB, nil, cfg.FrontendURL)
 		routerCfg.AssignHandler = handlers.NewAssignmentHandler(gormDB)
 		routerCfg.AnalyticsHandler = handlers.NewAnalyticsHandler(gormDB)
 		routerCfg.ProviderHandler = handlers.NewProviderHandler(gormDB, cfg.EncryptionKey)
@@ -331,7 +327,7 @@ func main() {
 		routerCfg.SystemMetricsHandler = handlers.NewSystemMetricsHandler(gormDB)
 		routerCfg.WebhookDeliveryHandler = handlers.NewWebhookDeliveryHandler(gormDB)
 		routerCfg.ExportHandler = handlers.NewExportHandler(gormDB)
-		routerCfg.PRHandler = handlers.NewPRHandler(gormDB, riverClient).WithGHClient(ghClient)
+		routerCfg.PRHandler = handlers.NewPRHandler(gormDB, riverClient).WithTokenCache(tokenCache, cfg.EncryptionKey)
 		routerCfg.EventsHandler = handlers.NewEventsHandler(eventHub, cfg.JWTSecret)
 		routerCfg.NotificationHandler = handlers.NewNotificationHandler(gormDB).WithEnqueuer(riverClient)
 		routerCfg.FeedbackHandler = handlers.NewFeedbackHandler(gormDB)
@@ -339,7 +335,8 @@ func main() {
 		routerCfg.AuditHandler = handlers.NewAuditHandler(gormDB)
 		routerCfg.RetentionHandler = handlers.NewRetentionHandler(gormDB)
 		routerCfg.SSOHandler = handlers.NewSSOHandler(gormDB, cfg.EncryptionKey, cfg.ServerURL, cfg.FrontendURL, cfg.JWTSecret, cfg.JWTTTLHours)
-		routerCfg.APITokenHandler = handlers.NewAPITokenHandler(gormDB)
+		routerCfg.APITokenHandler = handlers.NewAPITokenHandler(gormDB, cfg.APITokenMaxDays)
+		routerCfg.InviteHandler = handlers.NewInviteHandler(gormDB, cfg.FrontendURL, cfg.InviteTTLHours)
 		routerCfg.IntegrationHandler = handlers.NewIntegrationHandler(gormDB, cfg.EncryptionKey)
 		routerCfg.SlackAppHandler = handlers.NewSlackAppHandler(gormDB, cfg.EncryptionKey, cfg.ServerURL, riverClient, log)
 		routerCfg.RateLimiter = middleware.NewRateLimiter(1000) // 1000 req/hour default
@@ -598,22 +595,16 @@ func loadDBProvidersIntoRegistry(gormDB *gorm.DB, encKey string, registry *llm.P
 	}
 }
 
-// loadDBGithubSecrets reads WebhookSecret and GitHubToken from the DB-stored GithubAppConfig
-// and writes them into cfg, overriding any env-var values that are empty.
+// loadDBGithubSecrets reads the WebhookSecret from the DB-stored GithubAppConfig
+// and writes it into cfg, overriding any env-var value that is empty.
 func loadDBGithubSecrets(gormDB *gorm.DB, cfg *config.Config) {
 	var appCfg dbModels.GithubAppConfig
 	if err := gormDB.First(&appCfg).Error; err != nil {
 		return
 	}
-	encKey := cfg.EncryptionKey
 	if appCfg.WebhookSecretEncrypted != "" {
-		if dec, err := db.Decrypt(appCfg.WebhookSecretEncrypted, encKey); err == nil {
+		if dec, err := db.Decrypt(appCfg.WebhookSecretEncrypted, cfg.EncryptionKey); err == nil {
 			cfg.GitHubWebhookSecret = dec
-		}
-	}
-	if appCfg.GitHubTokenEncrypted != "" {
-		if dec, err := db.Decrypt(appCfg.GitHubTokenEncrypted, encKey); err == nil {
-			cfg.GitHubToken = dec
 		}
 	}
 }

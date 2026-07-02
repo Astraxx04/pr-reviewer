@@ -15,6 +15,12 @@ function severityVariant(s: string): "default" | "destructive" | "secondary" {
   return "default";
 }
 
+function scoreColor(score: number): string {
+  if (score >= 80) return "text-green-600 dark:text-green-400";
+  if (score >= 60) return "text-yellow-600 dark:text-yellow-400";
+  return "text-destructive";
+}
+
 export default function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { token } = useToken();
@@ -36,34 +42,37 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
   }, {});
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>← Back</Button>
-        <h1 className="text-2xl font-bold">Review #{review.ID}</h1>
-        <Badge variant={review.Status === "APPROVE" ? "default" : review.Status === "REQUEST_CHANGES" ? "destructive" : "secondary"}>
-          {review.Status}
-        </Badge>
-        <span className="text-muted-foreground text-sm font-mono">{review.Score}/100</span>
+    <div className="space-y-8 max-w-3xl">
+      <div>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => router.back()}>← Back</Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-3xl font-bold">Review #{review.ID}</h1>
+          <Badge variant={review.Status === "APPROVE" ? "default" : review.Status === "REQUEST_CHANGES" ? "destructive" : "secondary"}>
+            {review.Status}
+          </Badge>
+          <span className={`font-mono font-semibold text-lg ${scoreColor(review.Score)}`}>{review.Score}/100</span>
+        </div>
       </div>
 
       {review.Summary && (
-        <Card><CardHeader><CardTitle>Summary</CardTitle></CardHeader>
-          <CardContent><p className="text-sm">{review.Summary}</p></CardContent>
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-lg">Summary</CardTitle></CardHeader>
+          <CardContent><p className="text-base">{review.Summary}</p></CardContent>
         </Card>
       )}
 
       {Object.entries(byFile).map(([file, comments]) => (
         <Card key={file}>
-          <CardHeader><CardTitle className="font-mono text-sm">{file}</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="font-mono text-sm">{file}</CardTitle></CardHeader>
           <CardContent>
-            <ul className="space-y-3">
+            <ul className="space-y-4">
               {comments.map((c) => (
-                <li key={c.ID} className="text-sm border-l-2 pl-3 border-muted">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-muted-foreground">Line {c.Line}</span>
+                <li key={c.ID} className="border-l-2 pl-3 border-muted">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-sm text-muted-foreground">Line {c.Line}</span>
                     <Badge variant={severityVariant(c.Severity)} className="text-xs">{c.Severity}</Badge>
                   </div>
-                  <p>{c.Body}</p>
+                  <p className="text-base">{c.Body}</p>
                 </li>
               ))}
             </ul>
@@ -72,7 +81,7 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ id: str
       ))}
 
       {(review.Comments ?? []).length === 0 && (
-        <p className="text-muted-foreground text-sm">No comments on this review.</p>
+        <p className="text-base text-muted-foreground">No comments on this review.</p>
       )}
     </div>
   );

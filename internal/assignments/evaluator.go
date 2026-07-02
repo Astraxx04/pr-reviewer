@@ -27,15 +27,14 @@ func Evaluate(
 	rule *models.AssignmentRule,
 	prCtx *pr.PRContext,
 	codeowners []gh.CODEOWNERSRule,
-	installationID uint,
 ) (*Result, error) {
 	switch rule.Strategy {
 	case "codeowners":
 		return evaluateCodeowners(codeowners, prCtx)
 	case "round-robin":
-		return evaluateRoundRobin(ctx, db, rule, installationID)
+		return evaluateRoundRobin(ctx, db, rule)
 	case "load-balanced":
-		return evaluateLoadBalanced(ctx, db, rule, installationID)
+		return evaluateLoadBalanced(ctx, db, rule)
 	default:
 		return &Result{}, nil
 	}
@@ -52,29 +51,22 @@ func evaluateCodeowners(rules []gh.CODEOWNERSRule, prCtx *pr.PRContext) (*Result
 	return &Result{Assignees: gh.MatchOwners(rules, files)}, nil
 }
 
-func evaluateRoundRobin(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule, installationID uint) (*Result, error) {
-	members, err := getMembers(ctx, db, rule, installationID)
+func evaluateRoundRobin(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule) (*Result, error) {
+	members, err := getMembers(ctx, db, rule)
 	if err != nil || len(members) == 0 {
 		return &Result{}, err
 	}
-	// Single-org assumption: the assignment count is intentionally not scoped by
-	// installation. This deployment serves one organization (one installation),
-	// so the global count equals this org's count. If multiple installations are
-	// ever supported, scope this by installation_id.
 	var count int64
 	db.WithContext(ctx).Model(&models.Assignment{}).Count(&count)
 	return &Result{Assignees: []string{members[int(count)%len(members)]}}, nil
 }
 
-func evaluateLoadBalanced(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule, installationID uint) (*Result, error) {
-	members, err := getMembers(ctx, db, rule, installationID)
+func evaluateLoadBalanced(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule) (*Result, error) {
+	members, err := getMembers(ctx, db, rule)
 	if err != nil || len(members) == 0 {
 		return &Result{}, err
 	}
 
-	// Single-org assumption: the per-member tally is intentionally not scoped by
-	// installation (one organization = one installation). Scope by installation_id
-	// here if multiple installations are ever supported.
 	type countRow struct {
 		AssigneeLogin string
 		Cnt           int64
@@ -101,7 +93,7 @@ func evaluateLoadBalanced(ctx context.Context, db *gorm.DB, rule *models.Assignm
 	return &Result{Assignees: []string{pick}}, nil
 }
 
-func getMembers(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule, installationID uint) ([]string, error) {
+func getMembers(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule) ([]string, error) {
 	var cfg ruleConfig
 	if len(rule.Config) > 0 {
 		_ = json.Unmarshal(rule.Config, &cfg)
@@ -109,13 +101,5 @@ func getMembers(ctx context.Context, db *gorm.DB, rule *models.AssignmentRule, i
 	if len(cfg.Members) > 0 {
 		return cfg.Members, nil
 	}
-	teamMembers, err := repo.NewTeamMemberRepo(db).List(ctx, installationID)
-	if err != nil {
-		return nil, err
-	}
-	logins := make([]string, 0, len(teamMembers))
-	for _, m := range teamMembers {
-		logins = append(logins, m.Login)
-	}
-	return logins, nil
+	return repo.ListTeamLogins(ctx, db)
 }

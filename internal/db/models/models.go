@@ -12,9 +12,24 @@ type User struct {
 	Login     string `gorm:"not null"`
 	Email     string
 	AvatarURL string
-	Role      string `gorm:"default:viewer"` // owner|admin|reviewer|viewer
-	Status    string `gorm:"default:active"` // active|pending
+	Role      string `gorm:"default:reviewer"` // owner|admin|reviewer
+	Status    string `gorm:"default:active"`   // active|suspended
 	CreatedAt time.Time
+}
+
+// Invite tracks a pending or accepted email invitation.
+// TokenHash stores SHA-256(raw_token) — the raw token is never persisted.
+// A partial unique index (accepted_at IS NULL) prevents duplicate pending invites per email.
+type Invite struct {
+	ID         string    `gorm:"primarykey;type:uuid;default:gen_random_uuid()"`
+	Email      string    `gorm:"not null"`
+	Role       string    `gorm:"not null"` // admin|reviewer
+	TokenHash  string    `gorm:"uniqueIndex;not null"`
+	InvitedBy  string    `gorm:"not null"` // GitHub login of inviting admin
+	ExpiresAt  time.Time `gorm:"not null"`
+	AcceptedAt *time.Time
+	AcceptedBy string // GitHub login of the user who accepted
+	CreatedAt  time.Time
 }
 
 // Session tracks active user sessions for revocation support.
@@ -40,15 +55,12 @@ type Installation struct {
 	AccountLogin string `gorm:"uniqueIndex;not null"`
 	AccountType  string // User | Organization
 	CreatedAt    time.Time
-
-	Repos []Repository `gorm:"foreignKey:InstallationID"`
 }
 
-// ProviderConfig stores one LLM provider configuration per installation.
+// ProviderConfig stores one LLM provider configuration.
 // APIKeyEncrypted holds an AES-GCM ciphertext; never store the raw key.
 type ProviderConfig struct {
 	ID                 uint   `gorm:"primarykey"`
-	InstallationID     uint   `gorm:"index;not null"`
 	Name               string `gorm:"not null"` // user-facing label
 	Type               string `gorm:"not null"` // openai|anthropic|ollama|openai_compatible
 	APIKeyEncrypted    string
@@ -64,8 +76,7 @@ type ProviderConfig struct {
 }
 
 type Repository struct {
-	ID             uint `gorm:"primarykey"`
-	InstallationID uint `gorm:"index;not null"`
+	ID uint `gorm:"primarykey"`
 	// (Owner, Name) is the GitHub-global natural key for a repository.
 	Owner          string `gorm:"uniqueIndex:idx_repo_owner_name;not null"`
 	Name           string `gorm:"uniqueIndex:idx_repo_owner_name;not null"`
@@ -164,39 +175,28 @@ type Assignment struct {
 	CompletedAt   *time.Time
 }
 
-type TeamMember struct {
-	ID             uint   `gorm:"primarykey"`
-	InstallationID uint   `gorm:"index;not null"`
-	Login          string `gorm:"not null"`
-	Role           string `gorm:"default:reviewer"` // reviewer|admin
-	SlackUserID    string // Slack member ID (e.g. U012AB3CD) for DM notifications
-	CreatedAt      time.Time
-}
-
 // RepoAccess records which GitHub logins may access a repository, synced from the
 // repo's GitHub collaborators. Used to scope a non-admin user's repo visibility so
 // they only see repos they actually have access to on GitHub. (Owners/admins are
-// exempt and see every repo in the installation.)
+// exempt and see every repo.)
 type RepoAccess struct {
-	ID             uint   `gorm:"primarykey"`
-	InstallationID uint   `gorm:"index;not null"`
-	RepoID         uint   `gorm:"uniqueIndex:idx_repo_login;not null"`
-	Login          string `gorm:"uniqueIndex:idx_repo_login;not null"`
-	CreatedAt      time.Time
+	ID        uint   `gorm:"primarykey"`
+	RepoID    uint   `gorm:"uniqueIndex:idx_repo_login;not null"`
+	Login     string `gorm:"uniqueIndex:idx_repo_login;not null"`
+	CreatedAt time.Time
 }
 
-// NotificationConfig stores a notification channel configuration per installation (or per repo).
+// NotificationConfig stores a notification channel configuration (global or per repo).
 // Config is a JSON blob whose shape depends on Channel: slack | email | webhook.
-// RepoID == NULL means installation-wide default; a non-null RepoID overrides the default for that repo.
+// RepoID == NULL means global default; a non-null RepoID overrides the default for that repo.
 type NotificationConfig struct {
-	ID             uint           `gorm:"primarykey"`
-	InstallationID uint           `gorm:"index;not null"`
-	RepoID         *uint          `gorm:"index"`
-	Channel        string         `gorm:"not null"` // slack | email | webhook
-	Config         datatypes.JSON `gorm:"not null"`
-	Enabled        bool           `gorm:"default:true"`
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID        uint           `gorm:"primarykey"`
+	RepoID    *uint          `gorm:"index"`
+	Channel   string         `gorm:"not null"` // slack | email | webhook
+	Config    datatypes.JSON `gorm:"not null"`
+	Enabled   bool           `gorm:"default:true"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // SystemConfig stores key/value pairs for global installation settings.
@@ -242,7 +242,6 @@ type GithubAppConfig struct {
 	AppID                  int64  `gorm:"not null"`
 	PrivateKeyEncrypted    string `gorm:"not null"`
 	WebhookSecretEncrypted string
-	GitHubTokenEncrypted   string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }

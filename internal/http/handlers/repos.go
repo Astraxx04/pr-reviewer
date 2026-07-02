@@ -37,41 +37,25 @@ func (h *RepoHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	// Scope repos to the user's installation. installationIDForUser resolves the
-	// installation owned by the user's login, falling back to the single-tenant
-	// installation — so team members (whose login != the installation's
-	// account_login) still see the org's repos, not an empty list.
-	instID := installationIDForUser(h.db, user.Login)
-	q := h.db.WithContext(r.Context()).Where("installation_id = ?", instID)
+	q := h.db.WithContext(r.Context())
 	if !isAdmin(user) {
-		// Non-admins only see repos they have GitHub access to (synced from each
-		// repo's collaborators into repo_accesses). Per-repo fail-open: a repo with
-		// no synced access rows at all is treated as visible, so a sync gap or a
-		// missing GitHub permission never silently hides repos from the whole team.
-		q = q.Where(
-			"(id NOT IN (SELECT repo_id FROM repo_accesses WHERE installation_id = ?) "+
-				"OR id IN (SELECT repo_id FROM repo_accesses WHERE installation_id = ? AND login = ?))",
-			instID, instID, user.Login)
+		// Strictly fail-closed: non-admins see only repos with an explicit access row.
+		// Repos not yet synced are invisible until sync runs (triggered at login).
+		q = q.Where("id IN (SELECT repo_id FROM repo_accesses WHERE login = ?)", user.Login)
 	}
 	var repos []models.Repository
 	q.Find(&repos)
 	writeJSON(w, http.StatusOK, repos)
 }
 
-// canAccessRepo reports whether the user may view the given repo. Admins/owners
-// always can. For others: if the repo has any synced access rows, the user must
-// match one; if it has none (access unknown), it's visible (fail open).
+// canAccessRepo reports whether the user may view the given repo.
+// Admins/owners always can. Non-admins require an explicit repo_access row (fail-closed).
 func (h *RepoHandler) canAccessRepo(r *http.Request, repoID uint) bool {
 	user := getUser(r)
 	if user == nil {
 		return false
 	}
 	if isAdmin(user) {
-		return true
-	}
-	var total int64
-	h.db.WithContext(r.Context()).Model(&models.RepoAccess{}).Where("repo_id = ?", repoID).Count(&total)
-	if total == 0 {
 		return true
 	}
 	var mine int64
@@ -195,11 +179,25 @@ func (h *RepoHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find installation for this user.
+	// Load the single installation record, auto-registering it if missing.
+	// This handles the case where the installation.created webhook was never
+	// received (e.g. the app was installed before the server was running).
 	var inst models.Installation
-	if err := h.db.Where("account_login = ?", user.Login).First(&inst).Error; err != nil {
-		writeError(w, http.StatusNotFound, "no installation found for this account — ensure the GitHub App is installed")
-		return
+	if err := h.db.Order("id ASC").First(&inst).Error; err != nil {
+		info, discoverErr := gh.FindFirstInstallation(r.Context(), appCfg.AppID, []byte(privateKey))
+		if discoverErr != nil {
+			writeError(w, http.StatusNotFound, "no installation found — install the GitHub App on your organization and try again")
+			return
+		}
+		inst = models.Installation{
+			GithubInstallationID: &info.ID,
+			AccountLogin:         info.AccountLogin,
+			AccountType:          info.AccountType,
+		}
+		h.db.WithContext(r.Context()).
+			Where(models.Installation{AccountLogin: info.AccountLogin}).
+			Assign(models.Installation{GithubInstallationID: &info.ID, AccountType: info.AccountType}).
+			FirstOrCreate(&inst)
 	}
 
 	if inst.GithubInstallationID == nil {
@@ -218,7 +216,7 @@ func (h *RepoHandler) Sync(w http.ResponseWriter, r *http.Request) {
 
 	added, accessSynced := 0, 0
 	for _, ri := range repos {
-		rec, created, err := repo.UpsertRepository(r.Context(), h.db, inst.ID, ri.Owner, ri.Name, false)
+		rec, created, err := repo.UpsertRepository(r.Context(), h.db, ri.Owner, ri.Name, false)
 		if err != nil {
 			continue
 		}
@@ -236,7 +234,7 @@ func (h *RepoHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		if cErr != nil {
 			continue
 		}
-		h.replaceRepoAccess(r, inst.ID, rec.ID, logins)
+		h.replaceRepoAccess(r, rec.ID, logins)
 		accessSynced++
 	}
 
@@ -248,14 +246,14 @@ func (h *RepoHandler) Sync(w http.ResponseWriter, r *http.Request) {
 }
 
 // replaceRepoAccess overwrites the access rows for a repo with the given logins.
-func (h *RepoHandler) replaceRepoAccess(r *http.Request, instID, repoID uint, logins []string) {
+func (h *RepoHandler) replaceRepoAccess(r *http.Request, repoID uint, logins []string) {
 	h.db.WithContext(r.Context()).Where("repo_id = ?", repoID).Delete(&models.RepoAccess{})
 	if len(logins) == 0 {
 		return
 	}
 	rows := make([]models.RepoAccess, 0, len(logins))
 	for _, login := range logins {
-		rows = append(rows, models.RepoAccess{InstallationID: instID, RepoID: repoID, Login: login})
+		rows = append(rows, models.RepoAccess{RepoID: repoID, Login: login})
 	}
 	h.db.WithContext(r.Context()).Create(&rows)
 }

@@ -11,7 +11,6 @@ import (
 
 type Config struct {
 	ServerPort          string
-	GitHubToken         string // loaded from DB at startup; not an env var
 	GitHubWebhookSecret string // loaded from DB at startup; not an env var
 	GitHubClientID      string
 	GitHubClientSecret  string
@@ -25,9 +24,12 @@ type Config struct {
 	MigrateOnly         bool // if true: run migrations then exit (used by docker-compose migrate service)
 	SkipMigrations      bool // if true: the migrate step is a no-op (exits 0 without applying migrations)
 	// Access control
-	RequiredGithubOrg string // if set, users must be members of this GitHub org to log in
-	InviteOnly        bool   // if true, new users are created with status=pending until approved
+	RequiredGithubOrg string // required: users must be members of this GitHub org to log in
 	JWTTTLHours       int    // JWT lifetime in hours (default 24)
+	// Invite policy
+	InviteTTLHours int // invite link lifetime in hours (default 168 = 7 days)
+	// API token policy
+	APITokenMaxDays int // maximum token lifetime in days; 0 = no limit (default)
 }
 
 func Load() (*Config, error) {
@@ -40,15 +42,16 @@ func Load() (*Config, error) {
 		DatabaseURL:        getEnv("DATABASE_URL", ""),
 		JWTSecret:          getEnv("JWT_SECRET", "change-me-in-production"),
 		EncryptionKey:      getEnv("ENCRYPTION_KEY", ""),
-		ServerURL:          getEnv("SERVER_URL", "http://localhost:8001"),
-		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:3000"),
-		CORSOrigins:        getEnv("CORS_ORIGINS", getEnv("FRONTEND_URL", "http://localhost:3000")),
+		ServerURL:          getEnv("SERVER_URL", ""),
+		FrontendURL:        getEnv("FRONTEND_URL", ""),
+		CORSOrigins:        getEnv("CORS_ORIGINS", getEnv("FRONTEND_URL", "")),
 		AppEnv:             getEnv("APP_ENV", "development"),
 		MigrateOnly:        getEnv("MIGRATE_ONLY", "") == "true",
 		SkipMigrations:     getEnv("SKIP_MIGRATIONS", "") == "true",
 		RequiredGithubOrg:  getEnv("REQUIRED_GITHUB_ORG", ""),
-		InviteOnly:         getEnv("INVITE_ONLY", "") == "true",
 		JWTTTLHours:        getEnvInt("JWT_TTL_HOURS", 24),
+		InviteTTLHours:     getEnvInt("INVITE_TTL_HOURS", 7*24),
+		APITokenMaxDays:    getEnvInt("API_TOKEN_MAX_DAYS", 0),
 	}, nil
 }
 
@@ -60,12 +63,19 @@ func (c *Config) Validate() {
 	if c.EncryptionKey == "" {
 		missing = append(missing, "ENCRYPTION_KEY")
 	}
+	if c.RequiredGithubOrg == "" {
+		missing = append(missing, "REQUIRED_GITHUB_ORG")
+	}
 	if len(missing) > 0 {
 		fmt.Fprintf(os.Stderr, "fatal: required env vars not set: %s\n", strings.Join(missing, ", "))
 		os.Exit(1)
 	}
 	if c.JWTSecret == "change-me-in-production" && c.AppEnv != "development" {
 		fmt.Fprintln(os.Stderr, "fatal: JWT_SECRET must be changed from the default in production")
+		os.Exit(1)
+	}
+	if c.APITokenMaxDays < 0 {
+		fmt.Fprintln(os.Stderr, "fatal: API_TOKEN_MAX_DAYS must be 0 (no limit) or a positive integer")
 		os.Exit(1)
 	}
 }

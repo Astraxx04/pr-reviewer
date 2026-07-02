@@ -39,26 +39,24 @@ func UpsertInstallationStub(ctx context.Context, db *gorm.DB, login, accountType
 }
 
 // UpsertRepository finds a repository by its globally-unique (owner, name) key,
-// creating it under the given installation when absent. Existing rows keep
-// their current installation and enabled flag — enabledIfNew applies only on
-// creation. The bool result reports whether a new row was created.
-func UpsertRepository(ctx context.Context, db *gorm.DB, installationID uint, owner, name string, enabledIfNew bool) (*models.Repository, bool, error) {
+// creating it when absent. Existing rows keep their current enabled flag —
+// enabledIfNew applies only on creation. The bool result reports whether a new row was created.
+func UpsertRepository(ctx context.Context, db *gorm.DB, owner, name string, enabledIfNew bool) (*models.Repository, bool, error) {
 	var repo models.Repository
 	tx := db.WithContext(ctx).
 		Where(models.Repository{Owner: owner, Name: name}).
-		Attrs(models.Repository{InstallationID: installationID, Enabled: enabledIfNew}).
+		Attrs(models.Repository{Enabled: enabledIfNew}).
 		FirstOrCreate(&repo)
 	return &repo, tx.RowsAffected == 1, tx.Error
 }
 
-// FindOrCreateRepo ensures an Installation + Repository row exist for the given owner/name.
-// When triggered by a webhook there is no Installation record yet, so we create a stub.
+// FindOrCreateRepo ensures an Installation stub and Repository row exist for the given owner/name.
+// When triggered by a webhook before installation.created arrives, we create a stub.
 func FindOrCreateRepo(ctx context.Context, db *gorm.DB, owner, name string) (*models.Repository, error) {
-	inst, err := UpsertInstallationStub(ctx, db, owner, "User")
-	if err != nil {
+	if _, err := UpsertInstallationStub(ctx, db, owner, "User"); err != nil {
 		return nil, err
 	}
-	repo, _, err := UpsertRepository(ctx, db, inst.ID, owner, name, true)
+	repo, _, err := UpsertRepository(ctx, db, owner, name, true)
 	return repo, err
 }
 

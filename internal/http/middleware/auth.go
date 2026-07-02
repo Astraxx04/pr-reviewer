@@ -58,9 +58,13 @@ func Auth(secret string, db *gorm.DB) func(http.Handler) http.Handler {
 						http.Error(w, `{"error":"read-only token cannot perform write operations"}`, http.StatusForbidden)
 						return
 					}
-					// Fetch the user.
+					// Fetch the user and verify they're still active.
 					var u models.User
 					if db.First(&u, apiToken.UserID).Error == nil {
+						if u.Status != "active" {
+							http.Error(w, `{"error":"account suspended"}`, http.StatusForbidden)
+							return
+						}
 						// Update last_used_at asynchronously.
 						now := time.Now()
 						go db.Model(&apiToken).Update("last_used_at", now)
