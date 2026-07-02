@@ -77,6 +77,10 @@ func (h *UserHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "owner role cannot be changed")
 		return
 	}
+	if targetID == user.ID {
+		writeError(w, http.StatusForbidden, "cannot change your own role")
+		return
+	}
 
 	var body struct {
 		Role string `json:"role"`
@@ -126,6 +130,10 @@ func (h *UserHandler) Remove(w http.ResponseWriter, r *http.Request) {
 	}
 	if target.Role == "owner" {
 		writeError(w, http.StatusForbidden, "owner cannot be removed")
+		return
+	}
+	if targetID == user.ID {
+		writeError(w, http.StatusForbidden, "cannot remove yourself")
 		return
 	}
 	if err := h.userRepo.UpdateStatus(r.Context(), targetID, "suspended"); err != nil {

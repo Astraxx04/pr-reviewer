@@ -38,7 +38,7 @@ function isValidEmail(v: string) {
 }
 
 export default function TeamPage() {
-  const { token } = useToken();
+  const { token, userId: currentUserId } = useToken();
   const [members, setMembers]   = useState<TeamMember[]>([]);
   const [invites, setInvites]   = useState<Invite[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -182,8 +182,8 @@ export default function TeamPage() {
                 </div>
 
                 {/* role control */}
-                {m.role === "owner" ? (
-                  <Badge variant="outline" className={`text-sm px-3 py-1 ${roleBadgeClass.owner}`}>owner</Badge>
+                {m.role === "owner" || m.id === currentUserId ? (
+                  <Badge variant="outline" className={`text-sm px-3 py-1 ${roleBadgeClass[m.role] ?? ""}`}>{m.role}</Badge>
                 ) : (
                   <div className="flex rounded-md border overflow-hidden shrink-0 text-sm">
                     {(["admin", "reviewer"] as Role[]).map((r) => (
@@ -207,7 +207,7 @@ export default function TeamPage() {
                 )}
 
                 {/* remove */}
-                {m.role !== "owner" && (
+                {m.role !== "owner" && m.id !== currentUserId && (
                   <Button
                     variant="ghost"
                     size="icon"

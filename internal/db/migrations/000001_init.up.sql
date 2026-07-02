@@ -1,5 +1,4 @@
 -- Consolidated baseline schema for PR Reviewer.
--- Merges migrations 000001–000005 into a single init.
 -- River queue tables are managed separately by rivermigrate, not here.
 
 SET statement_timeout = 0;

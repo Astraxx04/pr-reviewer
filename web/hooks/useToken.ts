@@ -7,12 +7,12 @@ import { getToken, clearToken } from "@/lib/auth";
 // preventing a flash where admin-only nav items are briefly hidden on refresh.
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-function decodeRole(token: string): string {
+function decodePayload(token: string): { role: string; userId: number } {
   try {
     const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return (payload.role as string) ?? "viewer";
+    return { role: (payload.role as string) ?? "viewer", userId: (payload.sub as number) ?? 0 };
   } catch {
-    return "viewer";
+    return { role: "viewer", userId: 0 };
   }
 }
 
@@ -29,8 +29,8 @@ export function useToken() {
     window.location.href = "/login";
   }, []);
 
-  const role = token ? decodeRole(token) : null;
+  const { role, userId } = token ? decodePayload(token) : { role: null, userId: 0 };
   const isAdmin = role === "owner" || role === "admin";
 
-  return { token, logout, isLoading: token === null, role, isAdmin };
+  return { token, logout, isLoading: token === null, role, isAdmin, userId };
 }

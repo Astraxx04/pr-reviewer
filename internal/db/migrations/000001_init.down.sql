@@ -1,4 +1,4 @@
--- Drop everything created by the consolidated init migration.
+-- Drop everything created by the init migration.
 
 DROP TABLE IF EXISTS public.webhook_deliveries,
     public.sessions, public.review_comments, public.assignments,
