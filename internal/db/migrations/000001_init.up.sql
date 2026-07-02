@@ -427,7 +427,7 @@ CREATE INDEX idx_comment_feedbacks_review_comment_id ON public.comment_feedbacks
 CREATE UNIQUE INDEX idx_installations_account_login ON public.installations USING btree (account_login);
 CREATE UNIQUE INDEX idx_installations_github_installation_id ON public.installations USING btree (github_installation_id);
 CREATE UNIQUE INDEX idx_invites_token_hash ON public.invites USING btree (token_hash);
-CREATE UNIQUE INDEX idx_invites_pending_email ON public.invites (email) WHERE (accepted_at IS NULL);
+CREATE UNIQUE INDEX invites_pending_email_uniq ON public.invites (email) WHERE (accepted_at IS NULL);
 CREATE INDEX idx_notification_configs_repo_id ON public.notification_configs USING btree (repo_id);
 CREATE UNIQUE INDEX idx_pr_repo_number ON public.pull_requests USING btree (repo_id, number);
 CREATE UNIQUE INDEX idx_provider_healths_provider_config_id ON public.provider_healths USING btree (provider_config_id);
